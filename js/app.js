@@ -1,8 +1,8 @@
 'use strict';
 /* goed bezig: the game. One file, no build step.
    Bump VERSION on every change (and the ?v= in index.html, and CACHE in sw.js). */
-const VERSION = { name: 'GOED BEZIG', v: '1.2.0', date: '2026-11-19', note: 'fruit, groenten, vlees & vis, more hobbies' };
-const SYNC_READY = false;   // flips to true once the Google Sheet backend exists
+const VERSION = { name: 'GOED BEZIG', v: '1.3.0', date: '2026-11-19', note: 'sync between phone and laptop' };
+const SYNC_READY = true;   // flips to true once the Google Sheet backend exists
 const KEY = 'goedbezig.v1';
 const DAY = 864e5;
 

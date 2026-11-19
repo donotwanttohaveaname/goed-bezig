@@ -4,7 +4,7 @@
 
    What it keeps in the Sheet:
    - "Progress": one row per day you played (words met, known, by heart, wafels, streak).
-   - "Words":    all 300 words with their strength, rewritten on every save.
+   - "Words":    all words with their strength, rewritten on every save.
    - "_state":   the game's own save, as text. Hidden. Do not edit.
 
    SECRET is set in the deployed copy only. The copy in the public GitHub repo keeps the placeholder. */
