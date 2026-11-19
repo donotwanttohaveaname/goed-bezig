@@ -1,7 +1,7 @@
 'use strict';
 /* goed bezig: the game. One file, no build step.
    Bump VERSION on every change (and the ?v= in index.html, and CACHE in sw.js). */
-const VERSION = { name: 'GOED BEZIG', v: '1.1.0', date: '2026-11-19', note: 'all 300 open + sneltest' };
+const VERSION = { name: 'GOED BEZIG', v: '1.2.0', date: '2026-11-19', note: 'fruit, groenten, vlees & vis, more hobbies' };
 const SYNC_READY = false;   // flips to true once the Google Sheet backend exists
 const KEY = 'goedbezig.v1';
 const DAY = 864e5;
@@ -14,7 +14,12 @@ const pad = n => String(n).padStart(2, '0');
 function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 function dkey(d = new Date()) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
 function dayStart(ts) { const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); }
-function fill(s, extra = {}) { return s.replace(/\{(\w+)\}/g, (m, k) => k === 'name' ? S.name : k === 'dog' ? S.dog : (k in extra ? extra[k] : m)); }
+function fill(s, extra = {}) {
+  return s.replace(/\{(\w+)\}/g, (m, k, at) => {
+    const v = k === 'name' ? S.name : k === 'dog' ? (S.dog || 'mijn hond') : k === 'dogEn' ? (S.dog || 'my dog') : (k in extra ? extra[k] : m);
+    return at === 0 && typeof v === 'string' ? v.charAt(0).toUpperCase() + v.slice(1) : v;
+  });
+}
 
 /* -------------------------------------------------------------------- icons */
 const ICONS = {
@@ -32,6 +37,11 @@ const ICONS = {
   note: 'M9 18V5l11-2v13 M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0z M20 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z',
   calendar: 'M4 6h16v14H4z M4 10h16 M8 3v5 M16 3v5',
   fries: 'M7 11l2.500 10h5L17 11z M9.500 11V4 M12 11V3 M14.500 11V5',
+  apple: 'M12 7.500c-2.200-1.600-6-1-6 4 0 4 2.500 8.500 6 8.500s6-4.500 6-8.500c0-5-3.800-5.600-6-4z M12 7.500c0-2 1-3.500 3-4.500',
+  leaf: 'M5 19C5 10 10 5 20 4c-1 10-6 15-15 15z M5 19l8-8',
+  bowl: 'M3 11h18a9 9 0 0 1-18 0z M8 7c0-2 2-2 2-4 M13 7c0-2 2-2 2-4',
+  fish: 'M3 12c3-5 9-6 13-3l5-3v8l-5-3c-4 3-10 2-13-3z M7.500 11.500v.600',
+  brush: 'M4 20c0-2 1-3.500 3-3.500s2.500 1 2.500 2.500C9.500 20.500 7 21 4 20z M9.500 16.500L19 4l1.500 1.500L11.500 18',
   wafel: 'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M9 3v18 M15 3v18 M3 9h18 M3 15h18',
   flame: 'M12 22c4 0 7-2.900 7-6.800 0-3-1.800-5-3.400-6.900-.500 1.500-1.200 2.300-2.200 2.900.200-3.500-1.300-6.600-4.400-9.200.200 3-1 4.800-2.300 6.600C5.600 10.200 5 12.300 5 15.200 5 19.100 8 22 12 22z',
   speaker: 'M4 9v6h4l5 4V5L8 9z M16 9a4 4 0 0 1 0 6 M18.500 6.500a8 8 0 0 1 0 11',
@@ -47,6 +57,9 @@ const ICONS = {
 };
 function icon(name, cls = '') {
   return `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name] || ''}"/></svg>`;
+}
+function wafelArt() {
+  return '<svg class="wart" viewBox="0 0 96 96" aria-hidden="true"><rect x="8" y="8" width="80" height="80" rx="17"/><path d="M34.700 8v80 M61.300 8v80 M8 34.700h80 M8 61.300h80"/></svg>';
 }
 function dogSVG(mood = '') {
   return `<svg class="dog ${mood}" viewBox="0 0 120 104" aria-hidden="true">
@@ -64,8 +77,9 @@ function dogSVG(mood = '') {
 
 /* --------------------------------------------------------------------- data */
 const WORDS = [], SENTS = [], BYID = {};
+const PALETTE = ['pink', 'yellow', 'teal', 'orange', 'cyan', 'green', 'sky'];
 PLACES.forEach((p, pi) => {
-  p.index = pi;
+  p.index = pi; p.color = PALETTE[pi % PALETTE.length];
   p.items = p.words.map(([nl, en, flag]) => {
     const m = nl.match(/^(de|het) (\S+)$/);
     const w = {
@@ -77,6 +91,8 @@ PLACES.forEach((p, pi) => {
   });
   p.sents = p.sentences.map(([nl, en], i) => { const s = { id: p.id + '#' + i, nl, en, place: p }; SENTS.push(s); return s; });
 });
+
+const TOTAL = WORDS.length;
 
 /* -------------------------------------------------------------------- state */
 function fresh() {
@@ -92,6 +108,7 @@ function load() {
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* storage full or blocked */ } }
 let S = load();
+if (!S.m12) { if (S.dog === 'Wafel') S.dog = ''; S.m12 = 1; }
 
 const box = w => (S.items[w.id] ? S.items[w.id].b : 0);
 function R(w) { return S.items[w.id] || (S.items[w.id] = { b: 0, due: 0, ok: 0, bad: 0 }); }
@@ -352,10 +369,7 @@ VIEWS.home = () => {
       <button class="count wafels" data-act="go" data-to="stickers" aria-label="${S.wafels} wafels">${icon('wafel')}<b>${S.wafels}</b></button>
     </div>
   </header>
-  <section class="coach">
-    ${dogSVG('idle')}
-    <div class="say"><p class="nl">${esc(line[0])}</p><p class="en">${esc(line[1])}</p></div>
-  </section>
+  <section class="greet"><p class="nl">${esc(line[0])}</p><p class="en">${esc(line[1])}</p></section>
   <button class="btn btn-pink cta" data-act="${act}"><span class="stack">${cta}<em>${sub}</em></span>${icon('arrow')}</button>
   <section class="level">
     <div class="lvl-row"><h2>${lvl.nl}</h2><span class="lvl-en">${lvl.en}</span></div>
@@ -363,13 +377,13 @@ VIEWS.home = () => {
     <p class="fine">${next ? `${next.at - S.wafels} wafels to go until <b>${next.nl}</b>` : 'the top of the ladder. amai.'}</p>
   </section>
   <div class="duo">
-    ${unsorted().length ? `<button class="tile band c-cyan" data-act="sorteer"><span><h3>sneltest</h3><p>know some already? one tap per word sorts all 300</p></span><span class="rec">${300 - unsorted().length}/300</span></button>` : ''}
+    ${unsorted().length ? `<button class="tile band c-cyan" data-act="sorteer"><span><h3>sneltest</h3><p>know some already? one tap per word sorts them all</p></span><span class="rec">${TOTAL - unsorted().length}/${TOTAL}</span></button>` : ''}
     <button class="tile c-teal" data-act="dehet"><h3>de of het?</h3><p>45 seconds of nouns</p><span class="rec">record ${S.dehetBest}</span></button>
-    <button class="tile c-yellow" data-act="zinnen"><h3>zinnen bouwen</h3><p>78 sentences, all open</p><span class="rec">${S.zinnen} built</span></button>
+    <button class="tile c-yellow" data-act="zinnen"><h3>zinnen bouwen</h3><p>${SENTS.length} sentences, all open</p><span class="rec">${S.zinnen} built</span></button>
   </div>
   <h2 class="h">de route</h2>
   <ol class="route">${PLACES.map(p => placeCard(p, current)).join('')}</ol>
-  <p class="aside">300 woorden. allez, we gaan.</p>
+  <p class="aside">${TOTAL} woorden. allez, we gaan.</p>
   ${versionLine()}`;
 };
 function fillLine(l, extra) { return [fill(l[0], extra), fill(l[1], extra)]; }
@@ -382,7 +396,7 @@ function placeCard(p, current) {
     <span class="pn">${met}/${tot}</span>
     <span class="pbar"><i style="width:${Math.round(100 * met / tot)}%"></i></span>
     ${won ? `<span class="won" title="boss beaten">${icon('star')}</span>` : ''}
-    ${current === p ? `<span class="here">${dogSVG()}</span>` : ''}
+    ${current === p ? '<span class="here">hier</span>' : ''}
   </button></li>`;
 }
 
@@ -393,7 +407,7 @@ VIEWS.place = id => {
   return `
   <section class="hero c-${p.color}">
     <button class="x" data-act="go" data-to="home" aria-label="back">${icon('back')}</button>
-    <div class="hero-ic">${icon(p.icon)}</div>
+    <div class="hero-ic">${p.id === 'hond' ? dogSVG('happy') : icon(p.icon)}</div>
     <h1>${esc(p.nl)}</h1>
     <p>${esc(p.en)}</p>
     <div class="hero-stats"><span><b>${met}</b> of ${tot} met</span><span><b>${vb}</b> by heart</span></div>
@@ -409,7 +423,7 @@ VIEWS.place = id => {
   <h2 class="h">zinnen</h2>
   <ul class="words sents">${p.sents.map(s => `<li><button data-act="say" data-text="${esc(fill(s.nl))}" class="row">
       <span class="w-nl">${esc(fill(s.nl))}</span><span class="w-en">${esc(fill(s.en))}</span></button></li>`).join('')}</ul>
-  ${p.mine ? '<p class="fine pad">These basics were added on top of your own list to reach 300.</p>' : ''}
+  ${p.mine ? '<p class="fine pad">These words were added on top of your own list.</p>' : ''}
   ${versionLine()}`;
 };
 function pips(b) { return `<span class="pips" aria-label="strength ${b} of 5">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= b ? 'on' : ''}"></i>`).join('')}</span>`; }
@@ -473,7 +487,7 @@ function chrome(inner, opts = {}) {
       <div class="bar"><i style="width:${pct}%"></i></div>${right}</header>
     ${ses.mode === 'boss' ? '<div class="timer"><i id="timerBar"></i></div>' : ''}
     <main class="ses-main">${inner}</main>
-    <div class="foot">${opts.foot || `<div class="peek">${dogSVG('idle')}${ses.combo >= 3 && ses.mode !== 'boss' ? `<b>${ses.combo} op rij</b>` : ''}</div>`}<div class="fb" id="fb" hidden></div></div>
+    <div class="foot">${opts.foot || `<div class="peek">${ses.combo >= 3 && ses.mode !== 'boss' ? `<b>${ses.combo} op rij</b>` : ''}</div>`}<div class="fb" id="fb" hidden></div></div>
   </div>`;
 }
 function renderStep() {
@@ -576,7 +590,7 @@ function onType() {
 }
 
 function sentTokens(text) {
-  const proper = new Set(['Nederlands', 'Brussel', 'Aldi', 'Gent', 'Engels', S.name, S.dog]);
+  const proper = new Set(['Nederlands', 'Brussel', 'Aldi', 'Gent', 'Engels', 'Griekse', 'Belgisch', S.name, S.dog].filter(Boolean));
   let start = true; const out = [];
   fill(text).split(/\s+/).forEach(raw => {
     let t = raw.replace(/^["']+|[.,!?;:"']+$/g, '');
@@ -700,7 +714,7 @@ function onGotIt() {
 function checkStickers(flags = {}) {
   const met = count(WORDS, isMet), vb = count(WORDS, isByHeart), st = liveStreak();
   const rules = { first: S.walks >= 1, perfect: !!flags.perfect || !!S.stickers.perfect, combo10: S.bestCombo >= 10, streak3: st >= 3, streak7: st >= 7, streak30: st >= 30,
-    met50: met >= 50, met150: met >= 150, met300: met >= 300, vb100: vb >= 100, vb300: vb >= 300, dehet20: S.dehetBest >= 20, zin10: S.zinnen >= 10 };
+    met50: met >= 50, met150: met >= Math.ceil(TOTAL / 2), met300: met >= TOTAL, vb100: vb >= 100, vb300: vb >= TOTAL, dehet20: S.dehetBest >= 20, zin10: S.zinnen >= 10 };
   const got = [];
   STICKERS.forEach(s => { if (rules[s.id] && !S.stickers[s.id]) { S.stickers[s.id] = dkey(); got.push(s); } });
   return got;
@@ -723,11 +737,11 @@ VIEWS.summary = d => {
   if (ses.mode === 'sort') {
     const left = unsorted().length;
     return `<div class="sum">
-      <div class="sum-top c-cyan">${dogSVG('happy')}<h1>gesorteerd!</h1><p>What you knew comes back in a few days as a typing check.</p></div>
+      <div class="sum-top c-cyan">${wafelArt()}<h1>gesorteerd!</h1><p>What you knew comes back in a few days as a typing check.</p></div>
       <div class="chips">
         <div class="chip c-green"><b>${ses.ok}</b><span>you know already</span></div>
         <div class="chip c-yellow"><b>${ses.bad}</b><span>to learn</span></div>
-        <div class="chip c-pink"><b>${300 - left}</b><span>of 300 sorted</span></div>
+        <div class="chip c-pink"><b>${TOTAL - left}</b><span>of ${TOTAL} sorted</span></div>
         <div class="chip c-teal"><b>${count(WORDS, isMet)}</b><span>words known so far</span></div>
       </div>
       ${d.got.map(s => `<div class="news c-${s.color}"><b>sticker: ${esc(s.nl)}</b><span>${esc(s.en)}</span></div>`).join('')}
@@ -739,7 +753,7 @@ VIEWS.summary = d => {
   const head = d.perfect ? 'foutloos!' : acc >= 80 ? 'goed bezig!' : 'allez, het komt.';
   const headEn = d.perfect ? 'not one mistake' : acc >= 80 ? 'nice going' : "come on, it's coming";
   return `<div class="sum">
-    <div class="sum-top c-${d.perfect ? 'green' : 'yellow'}">${dogSVG('happy')}<h1>${head}</h1><p>${headEn}, ${esc(S.name)}</p></div>
+    <div class="sum-top c-${d.perfect ? 'green' : 'yellow'}">${wafelArt()}<h1>${head}</h1><p>${headEn}, ${esc(S.name)}</p></div>
     <div class="chips">
       <div class="chip c-pink"><b>+${ses.w}</b><span>wafels${d.bonus ? ` (${d.bonus} bonus)` : ''}</span></div>
       <div class="chip c-teal"><b>${acc}%</b><span>${ses.ok} of ${answered} right</span></div>
@@ -782,7 +796,7 @@ function endBoss(won) {
 VIEWS.bossend = d => {
   const p = PLACES.find(x => x.id === d.id);
   return `<div class="boss c-${d.won ? 'green' : 'orange'}">
-    <div class="boss-mid">${dogSVG(d.won ? 'happy' : 'sad')}
+    <div class="boss-mid">${d.won ? wafelArt() : ''}
       <h1>${d.won ? 'gewonnen!' : 'oei.'}</h1>
       <p class="quote">${d.won ? `${esc(p.boss.who)} is onder de indruk.` : `${esc(p.boss.who)} wint deze keer.`}</p>
       <p class="quote-en">${d.won ? `${esc(p.boss.who)} is impressed. +15 wafels${d.fresh ? ' and a new sticker' : ''}.` : `${esc(p.boss.who)} wins this time. ${ses.ok} of 12 right.`}</p></div>
@@ -838,7 +852,7 @@ function endDeHet() {
   go('dhend', { earned, record, got });
 }
 VIEWS.dhend = d => `<div class="boss c-teal">
-  <div class="boss-mid">${dogSVG('happy')}<h1>${dh.score}</h1>
+  <div class="boss-mid"><h1>${dh.score}</h1>
     <p class="quote">${d.record ? 'nieuw record!' : 'juiste lidwoorden'}</p>
     <p class="quote-en">${d.record ? 'a new record' : 'articles right'}. ${dh.miss} missed. +${d.earned} wafels. best: ${S.dehetBest}.</p>
     ${d.got.map(s => `<div class="news c-yellow"><b>sticker: ${esc(s.nl)}</b><span>${esc(s.en)}</span></div>`).join('')}</div>
@@ -848,7 +862,7 @@ AFTER.dhend = d => { if (d.record || d.got.length) { sfx.win(); confetti(); } };
 
 /* ----------------------------------------------------------------- progress */
 VIEWS.progress = () => {
-  const met = count(WORDS, isMet), known = count(WORDS, isKnown), vb = count(WORDS, isByHeart), unmet = 300 - met;
+  const met = count(WORDS, isMet), known = count(WORDS, isKnown), vb = count(WORDS, isByHeart), unmet = TOTAL - met;
   const days = [...Array(14)].map((_, i) => { const d = new Date(Date.now() - (13 - i) * DAY); return { d, k: dkey(d), v: (S.days[dkey(d)] || {}).a || 0 }; });
   const max = Math.max(20, ...days.map(x => x.v));
   const all = Object.values(S.days).reduce((t, d) => ({ a: t.a + d.a, c: t.c + d.c }), { a: 0, c: 0 });
@@ -863,7 +877,7 @@ VIEWS.progress = () => {
     <div class="b3 c-teal"><b>${known}</b><span>gekend</span><small>right 3 times running</small></div>
     <div class="b3 c-pink"><b>${vb}</b><span>van buiten</span><small>by heart</small></div>
   </section>
-  <p class="lede">${unmet > 0 ? `${unmet} words still to meet. At ${S.pace} a day you have met all 300 by <b>${eta.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}</b>.` : 'You have met all 300. Now it is repetition until they stick: amai.'}</p>
+  <p class="lede">${unmet > 0 ? `${unmet} words still to meet. At ${S.pace} a day you have met all ${TOTAL} by <b>${eta.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}</b>.` : `You have met all ${TOTAL}. Now it is repetition until they stick: amai.`}</p>
   <h2 class="h">laatste 14 dagen</h2>
   <div class="days" role="img" aria-label="answers per day, last 14 days">${days.map(x => `<div class="day ${x.k === dkey() ? 'now' : ''}"><span class="v">${x.v || ''}</span><i style="height:${Math.max(x.v ? 6 : 2, Math.round(100 * x.v / max))}%"></i><span class="l">${wd[x.d.getDay()]}</span></div>`).join('')}</div>
   <p class="fine pad">${all.a} answers so far, ${acc}% right. Best streak: ${S.streak.best} ${S.streak.best === 1 ? 'day' : 'days'}. Best run: ${S.bestCombo} in a row.</p>
@@ -895,7 +909,7 @@ VIEWS.settings = () => `
   <header class="top"><div class="brand">instellingen</div></header>
   <form class="set" data-form="settings">
     <label>your name<input name="name" value="${esc(S.name)}" maxlength="20" autocomplete="off"></label>
-    <label>your dog's name<input name="dog" value="${esc(S.dog)}" maxlength="20" autocomplete="off"></label>
+    <label>your dog's name <small>optional: she then shows up by name in two sentences</small><input name="dog" value="${esc(S.dog)}" maxlength="20" autocomplete="off"></label>
     <fieldset><legend>new words a day</legend><div class="seg">${[[10, 'rustig'], [20, 'stevig'], [30, 'turbo']].map(([n, l]) => `<label><input type="radio" name="pace" value="${n}" ${S.pace === n ? 'checked' : ''}><span><b>${n}</b>${l}</span></label>`).join('')}</div></fieldset>
     <label class="tog"><input type="checkbox" name="sound" ${S.sound ? 'checked' : ''}><span>sounds and buzz</span></label>
     <label class="tog"><input type="checkbox" name="voice" ${S.voice ? 'checked' : ''}><span>say words out loud ${voice ? `(${esc(voice.name)}, ${esc(voice.lang)})` : '(no Dutch voice on this device)'}</span></label>
@@ -913,11 +927,10 @@ VIEWS.settings = () => `
 
 /* --------------------------------------------------------------- onboarding */
 VIEWS.hello = () => `<div class="hello">
-  <div class="hello-top c-yellow">${dogSVG('happy')}<h1>hallo!</h1><p>Woef. I only listen to Dutch, so you are learning 300 words. I get walks, you get wafels.</p></div>
+  <div class="hello-top c-yellow">${wafelArt()}<h1>hallo!</h1><p>${TOTAL} Flemish Dutch words and ${SENTS.length} sentences, one wafel at a time. Know some already? Start with the sneltest.</p></div>
   <form class="set" data-form="hello">
     <label>hoe heet jij? <small>what's your name?</small><input name="name" value="${esc(S.name)}" maxlength="20" autocomplete="off" required></label>
-    <label>en hoe heet ik? <small>and what's my name? your dog's name goes here</small><input name="dog" value="${esc(S.dog)}" maxlength="20" autocomplete="off" placeholder="Wafel"></label>
-    <fieldset><legend>hoe snel? <small>new words a day</small></legend><div class="seg">${[[10, 'rustig', '30 days'], [20, 'stevig', '15 days'], [30, 'turbo', '10 days']].map(([n, l, d]) => `<label><input type="radio" name="pace" value="${n}" ${S.pace === n ? 'checked' : ''}><span><b>${n}</b>${l}<i>${d}</i></span></label>`).join('')}</div></fieldset>
+    <fieldset><legend>hoe snel? <small>new words a day</small></legend><div class="seg">${[[10, 'rustig'], [20, 'stevig'], [30, 'turbo']].map(n => [n[0], n[1], Math.ceil(TOTAL / n[0]) + ' days']).map(([n, l, d]) => `<label><input type="radio" name="pace" value="${n}" ${S.pace === n ? 'checked' : ''}><span><b>${n}</b>${l}<i>${d}</i></span></label>`).join('')}</div></fieldset>
     <button class="btn btn-pink wide">allez, we gaan<em>come on, let's go</em></button>
   </form>
   ${versionLine()}</div>`;
@@ -979,7 +992,7 @@ document.addEventListener('submit', e => {
   if (f.dataset.form === 'type') onType();
   if (f.dataset.form === 'hello') {
     const fd = new FormData(f);
-    S.name = (fd.get('name') || '').trim() || 'Anna'; S.dog = (fd.get('dog') || '').trim() || 'Wafel'; S.pace = +fd.get('pace') || 20;
+    S.name = (fd.get('name') || '').trim() || 'Anna'; S.pace = +fd.get('pace') || 20;
     S.onboarded = true; S.setT = Date.now(); save(); sfx.win(); go('home'); syncSoon();
   }
   if (f.dataset.form === 'link') {
@@ -993,7 +1006,7 @@ document.addEventListener('change', e => {
   const f = e.target.closest('[data-form="settings"]');
   if (f) {
     const fd = new FormData(f);
-    S.name = (fd.get('name') || '').trim() || 'Anna'; S.dog = (fd.get('dog') || '').trim() || 'Wafel'; S.pace = +fd.get('pace') || 20;
+    S.name = (fd.get('name') || '').trim() || 'Anna'; S.dog = (fd.get('dog') || '').trim(); S.pace = +fd.get('pace') || 20;
     S.sound = !!fd.get('sound'); S.voice = !!fd.get('voice'); S.setT = Date.now(); save(); toast('Saved.'); syncSoon();
   }
   if (e.target.id === 'importFile' && e.target.files[0]) {

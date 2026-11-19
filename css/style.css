@@ -100,7 +100,12 @@ body[data-sync="error"] #nav button[data-to="settings"]::after{content:"";positi
 .dog.sad .mouth{transform:translateY(4px) scaleY(-1);transform-box:fill-box;transform-origin:center}
 
 /* ---- home ---- */
-.coach{display:flex;align-items:center;gap:14px;margin:18px 0 20px}
+.greet{margin:22px 0 22px}
+.greet .nl{font:800 clamp(28px,8.200vw,34px)/1.08 var(--display);letter-spacing:-.04em;text-wrap:balance}
+.greet .en{font-size:15px;color:var(--muted);margin-top:6px}
+.wart{width:84px;height:84px;display:block;transform:rotate(-8deg)}
+.wart rect{fill:var(--white);stroke:var(--ink);stroke-width:5}
+.wart path{fill:none;stroke:var(--ink);stroke-width:5}
 .say{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;flex:1;min-width:0}
 .say::before{content:"";position:absolute;left:-7px;top:50%;width:12px;height:12px;background:var(--surface);border-left:1px solid var(--line);border-bottom:1px solid var(--line);transform:translateY(-50%) rotate(45deg)}
 .say .nl{font:700 19px/1.2 var(--display);letter-spacing:-.02em;text-wrap:balance}
@@ -142,8 +147,7 @@ body[data-sync="error"] #nav button[data-to="settings"]::after{content:"";positi
 .place.locked .pi{background:transparent;border:1px solid var(--line2);color:var(--muted)}
 .place.locked .pt b{color:var(--muted)}
 .place.locked .pt small{color:var(--muted)}
-.here{position:absolute;right:-10px;top:-22px;width:52px;animation:bob 2.400s ease-in-out infinite}
-.here .dog{width:52px}
+.here{position:absolute;right:14px;top:-11px;background:var(--ink);color:#fff;font:700 12.500px/1 var(--display);padding:5px 8px;border-radius:var(--chip);transform:rotate(3deg)}
 @keyframes bob{50%{transform:translateY(-4px) rotate(-4deg)}}
 .won{position:absolute;left:-8px;top:-8px;width:30px;height:30px;border-radius:50%;background:var(--ink);color:var(--yellow);display:grid;place-items:center}
 .won .ic{width:16px;height:16px;fill:currentColor}
@@ -151,7 +155,7 @@ body[data-sync="error"] #nav button[data-to="settings"]::after{content:"";positi
 /* ---- place ---- */
 .hero{background:var(--c);margin:0 calc(var(--gut) * -1);padding:calc(var(--st) + 16px) var(--gut) 26px;border-radius:0 0 var(--r-lg) var(--r-lg);margin-top:calc(var(--st) * -1)}
 .x{width:44px;height:44px;border-radius:50%;background:var(--white);display:grid;place-items:center;flex:none;border:1px solid var(--line)}
-.hero-ic{margin-top:22px}.hero-ic .ic{width:40px;height:40px}
+.hero-ic{margin-top:22px}.hero-ic .ic{width:40px;height:40px}.hero-ic .dog{width:84px}
 .hero h1{font:800 44px/1 var(--display);letter-spacing:-.045em;margin-top:10px;text-wrap:balance}
 .hero p{font-size:16px;color:var(--on);margin-top:6px}
 .hero-stats{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap}
@@ -211,7 +215,6 @@ body[data-sync="error"] #nav button[data-to="settings"]::after{content:"";positi
 .foot{position:sticky;bottom:0;min-height:calc(92px + var(--sb));padding:14px var(--gut) calc(14px + var(--sb));display:flex;align-items:center}
 .foot>.btn{width:100%}
 .peek{display:flex;align-items:center;gap:10px;font:700 14px/1.2 var(--display);color:var(--muted)}
-.peek .dog{width:48px}
 .peek b{background:var(--yellow);color:var(--ink);border-radius:var(--chip);padding:6px 8px;font-variant-numeric:tabular-nums}
 .fb{position:absolute;left:0;right:0;bottom:0;background:var(--green);padding:16px var(--gut) calc(16px + var(--sb));min-height:calc(92px + var(--sb));
   display:flex;align-items:center;animation:rise .28s var(--ease);z-index:5}

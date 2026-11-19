@@ -1,7 +1,7 @@
 {
   "name": "goed bezig",
   "short_name": "goed bezig",
-  "description": "A silly little game for learning 300 Flemish Dutch words.",
+  "description": "A silly little game for learning Flemish Dutch words.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -1,6 +1,6 @@
 /* goed bezig: the words, the places, the sentences.
    225 words come from Anna's own list (flemish_dutch_vocabulary.csv).
-   75 were added to reach 300: places marked mine:true.
+   The rest were added later: places marked mine:true.
    Word format: [dutch, english] or [dutch, english, 'p'] for a plural noun. */
 
 const PLACES = [
@@ -38,7 +38,7 @@ const PLACES = [
     ],
     sentences: [
       ['Ik ben {name} en ik heb een hond.', 'I am {name} and I have a dog.'],
-      ['Mijn hond heet {dog}.', 'My dog is called {dog}.'],
+      ['Ik ben hier met mijn zus.', 'I am here with my sister.'],
       ['Ik heb geen kat.', "I don't have a cat."],
       ['Thee zonder melk, alstublieft.', 'Tea without milk, please.'],
       ['Hij is ook een beetje moe.', 'He is also a little tired.'],
@@ -123,6 +123,90 @@ const PLACES = [
     ]
   },
   {
+    id: 'fruit', nl: 'fruit', en: 'all kinds of fruit', color: 'pink', icon: 'apple', mine: true,
+    boss: { who: 'de fruitboer', line: 'Proeven? Lekker zoet!', lineEn: 'Want a taste? Nice and sweet!' },
+    words: [
+      ['het fruit', 'fruit'], ['de peer', 'pear'], ['de sinaasappel', 'orange'], ['de mandarijn', 'mandarin'],
+      ['de citroen', 'lemon'], ['de limoen', 'lime'], ['de pompelmoes', 'grapefruit'], ['de aardbei', 'strawberry'],
+      ['de framboos', 'raspberry'], ['de bosbes', 'blueberry'], ['de braam', 'blackberry'], ['de kers', 'cherry'],
+      ['de druif', 'grape'], ['de perzik', 'peach'], ['de abrikoos', 'apricot'], ['de pruim', 'plum'],
+      ['de ananas', 'pineapple'], ['de mango', 'mango'], ['de kiwi', 'kiwi'], ['de meloen', 'melon'],
+      ['de watermeloen', 'watermelon'], ['de vijg', 'fig'], ['de avocado', 'avocado'], ['de kokosnoot', 'coconut'],
+      ['de noot', 'nut']
+    ],
+    sentences: [
+      ['Ik eet elke dag fruit.', 'I eat fruit every day.'],
+      ['Een kilo aardbeien, alstublieft.', 'A kilo of strawberries, please.'],
+      ['De druiven zijn heel zoet.', 'The grapes are very sweet.'],
+      ['Ik wil een appel en een peer.', 'I want an apple and a pear.'],
+      ['Mijn zus eet graag kersen.', 'My sister likes eating cherries.'],
+      ['Is de mango rijp?', 'Is the mango ripe?']
+    ]
+  },
+  {
+    id: 'groen', nl: 'groenten', en: 'vegetables & herbs', color: 'green', icon: 'leaf', mine: true,
+    boss: { who: 'de groenteboer', line: 'Verse groenten! Wat mag het zijn?', lineEn: 'Fresh vegetables! What will it be?' },
+    words: [
+      ['de tomaat', 'tomato'], ['de komkommer', 'cucumber'], ['de wortel', 'carrot'], ['de ui', 'onion'],
+      ['de knoflook', 'garlic'], ['de paprika', 'bell pepper'], ['de sla', 'lettuce'], ['de spinazie', 'spinach'],
+      ['de broccoli', 'broccoli'], ['de bloemkool', 'cauliflower'], ['de kool', 'cabbage'],
+      ['de spruitjes', 'Brussels sprouts', 'p'], ['het witloof', 'chicory'], ['de courgette', 'courgette'],
+      ['de aubergine', 'aubergine'], ['de champignon', 'mushroom'], ['de prei', 'leek'], ['de selder', 'celery'],
+      ['de erwten', 'peas', 'p'], ['de bonen', 'beans', 'p'], ['de maïs', 'corn'], ['de pompoen', 'pumpkin'],
+      ['de rode biet', 'beetroot'], ['de asperge', 'asparagus'], ['de radijs', 'radish'],
+      ['de zoete aardappel', 'sweet potato'], ['de gember', 'ginger'], ['de peterselie', 'parsley']
+    ],
+    sentences: [
+      ['Ik koop groenten op de markt.', 'I buy vegetables at the market.'],
+      ['Zonder ui, alstublieft.', 'Without onion, please.'],
+      ['De soep is met wortel en prei.', 'The soup is made with carrot and leek.'],
+      ['Wij eten vanavond witloof.', "We're eating chicory tonight."],
+      ['Ik eet graag broccoli met knoflook.', 'I like eating broccoli with garlic.'],
+      ['De tomaten zijn nog niet rijp.', 'The tomatoes are not ripe yet.']
+    ]
+  },
+  {
+    id: 'salade', nl: 'salades', en: 'salads, soup & what goes on top', color: 'teal', icon: 'bowl', mine: true,
+    boss: { who: 'de kok', line: 'Dressing erbij? Zout en peper?', lineEn: 'Dressing with that? Salt and pepper?' },
+    words: [
+      ['de salade', 'salad'], ['de gemengde salade', 'mixed salad'], ['de tomatensalade', 'tomato salad'],
+      ['de Griekse salade', 'Greek salad'], ['de aardappelsalade', 'potato salad'], ['de pastasalade', 'pasta salad'],
+      ['de kipsalade', 'chicken salad'], ['de tonijnsalade', 'tuna salad'], ['de fruitsalade', 'fruit salad'],
+      ['de olijf', 'olive'], ['de olijfolie', 'olive oil'], ['de azijn', 'vinegar'], ['het zout', 'salt'],
+      ['de peper', 'pepper'], ['de dressing', 'dressing'], ['de saus', 'sauce'], ['de mayonaise', 'mayonnaise'],
+      ['de soep', 'soup']
+    ],
+    sentences: [
+      ['Ik maak een salade met tomaat en komkommer.', "I'm making a salad with tomato and cucumber."],
+      ['Ik doe olijfolie en azijn op de salade.', 'I put olive oil and vinegar on the salad.'],
+      ['Een Griekse salade zonder olijven, alstublieft.', 'A Greek salad without olives, please.'],
+      ['Mag ik het zout en de peper?', 'May I have the salt and the pepper?'],
+      ['Als lunch eet ik soep met brood.', 'For lunch I eat soup with bread.']
+    ]
+  },
+  {
+    id: 'vlees', nl: 'vlees & vis', en: 'meat & fish', color: 'orange', icon: 'fish', mine: true,
+    boss: { who: 'de beenhouwer', line: 'En voor mevrouw?', lineEn: 'And for madam?' },
+    words: [
+      ['de kip', 'chicken'], ['het rundvlees', 'beef'], ['het varkensvlees', 'pork'], ['het lamsvlees', 'lamb'],
+      ['het kalfsvlees', 'veal'], ['het gehakt', 'minced meat'], ['de worst', 'sausage'], ['de ham', 'ham'],
+      ['het spek', 'bacon'], ['de biefstuk', 'steak'], ['de kalkoen', 'turkey'], ['de eend', 'duck'],
+      ['de hamburger', 'hamburger'], ['het stoofvlees', 'Flemish beef stew'], ['de beenhouwer', 'butcher'],
+      ['de tonijn', 'tuna'], ['de kabeljauw', 'cod'], ['de forel', 'trout'], ['de haring', 'herring'],
+      ['de makreel', 'mackerel'], ['de tong', 'sole'], ['de mosselen', 'mussels', 'p'], ['de inktvis', 'squid'],
+      ['de krab', 'crab'], ['de kreeft', 'lobster'], ['de oester', 'oyster'], ['de scampi', 'scampi', 'p'],
+      ['de zeevruchten', 'seafood', 'p'], ['de viswinkel', 'fish shop']
+    ],
+    sentences: [
+      ['Ik eet liever vis dan vlees.', "I'd rather eat fish than meat."],
+      ['De kip met rijst is lekker.', 'The chicken with rice is tasty.'],
+      ['Een biefstuk met frietjes, alstublieft.', 'A steak with fries, please.'],
+      ['Mosselen met frietjes is echt Belgisch.', 'Mussels with fries is properly Belgian.'],
+      ['Is er vlees in de soep?', 'Is there meat in the soup?'],
+      ['Ik neem de zalm met groenten.', "I'll have the salmon with vegetables."]
+    ]
+  },
+  {
     id: 'cijfers', nl: 'cijfers', en: 'numbers', color: 'sky', icon: 'hash', mine: true,
     boss: { who: 'de kassierster van Aldi', line: 'Dat is dan twintig euro. Volgende!', lineEn: "That'll be twenty euros. Next!" },
     words: [
@@ -135,7 +219,7 @@ const PLACES = [
       ['Twee koffies en drie wafels, alstublieft.', 'Two coffees and three waffles, please.'],
       ['De bus komt om acht uur.', "The bus comes at eight o'clock."],
       ['Hoeveel is dat? Tien euro.', 'How much is that? Ten euros.'],
-      ['De hond van de buurman is vier jaar oud.', "The neighbour's dog is four years old."]
+      ['Het kind van de buurvrouw is vier jaar oud.', "The neighbour's child is four years old."]
     ]
   },
   {
@@ -175,13 +259,13 @@ const PLACES = [
       ['Ik ben blij, maar ook een beetje moe.', "I'm happy, but also a little tired."],
       ['Waarom ben je boos?', 'Why are you angry?'],
       ['Nederlands is niet gemakkelijk, maar wel interessant.', 'Dutch is not easy, but it is interesting.'],
-      ['{dog} is nooit verdrietig.', '{dog} is never sad.'],
+      ['Mijn zus is altijd enthousiast.', 'My sister is always enthusiastic.'],
       ['Ik ben zenuwachtig voor morgen.', "I'm nervous about tomorrow."]
     ]
   },
   {
     id: 'hond', nl: 'de hond', en: 'dog & animals', color: 'teal', icon: 'paw',
-    boss: { who: 'de dierenarts', line: 'Dag {dog}! Even kijken.', lineEn: "Hello {dog}! Let's have a look." },
+    boss: { who: 'de dierenarts', line: 'Wie is hier zo braaf geweest?', lineEn: 'Who has been such a good girl?' },
     words: [
       ['de hond', 'dog'], ['de kat', 'cat'], ['het dier', 'animal'], ['de wandeling', 'walk'],
       ['de dierenarts', 'veterinarian'], ['de riem', 'leash'], ['de puppy', 'puppy'], ['blaffen', 'to bark'],
@@ -191,8 +275,8 @@ const PLACES = [
       ['Ik moet de hond uitlaten.', 'I have to take the dog out.'],
       ['Waar is de riem?', 'Where is the leash?'],
       ['Wij maken een wandeling in het park.', "We're going for a walk in the park."],
-      ['{dog} blaft soms naar de kat van de buren.', "{dog} sometimes barks at the neighbours' cat."],
-      ['De dierenarts is heel lief voor {dog}.', 'The vet is very sweet to {dog}.']
+      ['{dog} blaft soms naar de kat van de buren.', "{dogEn} sometimes barks at the neighbours' cat."],
+      ['De dierenarts is heel lief voor {dog}.', 'The vet is very sweet to {dogEn}.']
     ]
   },
   {
@@ -238,6 +322,29 @@ const PLACES = [
       ['Wil je een film kijken?', 'Do you want to watch a film?'],
       ['In de vakantie ga ik naar het strand.', 'In the holidays I go to the beach.'],
       ['Wij gaan zondag naar het museum.', "We're going to the museum on Sunday."]
+    ]
+  },
+  {
+    id: 'hobby', nl: "meer hobby's", en: 'painting, cycling, baking and more', color: 'yellow', icon: 'brush', mine: true,
+    boss: { who: 'de juf van de tekenles', line: 'Penselen klaar? We beginnen!', lineEn: 'Brushes ready? Off we go!' },
+    words: [
+      ['schilderen', 'to paint'], ['tekenen', 'to draw'], ['schrijven', 'to write'], ['fietsen', 'to cycle'],
+      ['gaan lopen', 'to go for a run'], ['sporten', 'to exercise'], ['tuinieren', 'to garden'], ['bakken', 'to bake'],
+      ['breien', 'to knit'], ['naaien', 'to sew'], ['knutselen', 'to do crafts'], ['puzzelen', 'to do puzzles'],
+      ['gamen', 'to play video games'], ['kamperen', 'to camp'], ['vissen', 'to go fishing'], ['klimmen', 'to climb'],
+      ['skiën', 'to ski'], ['winkelen', 'to go shopping'], ['voetballen', 'to play football'],
+      ['tennissen', 'to play tennis'], ['yoga doen', 'to do yoga'], ['gitaar spelen', 'to play guitar'],
+      ['piano spelen', 'to play piano'], ['naar muziek luisteren', 'to listen to music'],
+      ['series kijken', 'to watch series'], ['het schilderij', 'painting (the picture)'],
+      ['de tekening', 'drawing (the picture)'], ['de verf', 'paint']
+    ],
+    sentences: [
+      ['Ik schilder graag in het weekend.', 'I like painting at the weekend.'],
+      ['Mijn vriendin kan heel goed tekenen.', 'My friend can draw very well.'],
+      ['Wij gaan zondag fietsen.', "We're going cycling on Sunday."],
+      ['Ik lees elke avond een boek.', 'I read a book every evening.'],
+      ['Zullen we samen iets bakken?', 'Shall we bake something together?'],
+      ['Ik speel piano, maar niet zo goed.', 'I play the piano, but not so well.']
     ]
   },
   {
@@ -296,32 +403,32 @@ const LEVELS = [
 
 /* Stickers that are not boss stickers. Boss stickers are generated per place. */
 const STICKERS = [
-  { id: 'first', nl: 'eerste wandeling', en: 'finish your first walk', icon: 'paw', color: 'pink' },
+  { id: 'first', nl: 'eerste wandeling', en: 'finish your first walk', icon: 'route', color: 'pink' },
   { id: 'perfect', nl: 'foutloos', en: 'a walk without one mistake', icon: 'check', color: 'green' },
   { id: 'combo10', nl: 'tien op rij', en: 'ten right in a row', icon: 'bolt', color: 'yellow' },
   { id: 'streak3', nl: 'drie dagen', en: 'three days in a row', icon: 'flame', color: 'orange' },
   { id: 'streak7', nl: 'een hele week', en: 'seven days in a row', icon: 'flame', color: 'pink' },
   { id: 'streak30', nl: 'een maand', en: 'thirty days in a row', icon: 'flame', color: 'cyan' },
   { id: 'met50', nl: 'vijftig woorden', en: '50 words met', icon: 'bubble', color: 'teal' },
-  { id: 'met150', nl: 'halfweg', en: '150 words met', icon: 'bike', color: 'yellow' },
-  { id: 'met300', nl: 'alle driehonderd', en: 'all 300 words met', icon: 'star', color: 'pink' },
+  { id: 'met150', nl: 'halfweg', en: 'half of all words met', icon: 'bike', color: 'yellow' },
+  { id: 'met300', nl: 'alles ontmoet', en: 'every word met', icon: 'star', color: 'pink' },
   { id: 'vb100', nl: 'honderd van buiten', en: '100 words by heart', icon: 'heart', color: 'sky' },
-  { id: 'vb300', nl: 'echte Vlaming', en: 'all 300 by heart', icon: 'fries', color: 'orange' },
+  { id: 'vb300', nl: 'echte Vlaming', en: 'every word by heart', icon: 'fries', color: 'orange' },
   { id: 'dehet20', nl: 'de of het? de!', en: '20 in one round of de of het', icon: 'blocks', color: 'teal' },
   { id: 'zin10', nl: 'zinnenbouwer', en: 'build 10 sentences', icon: 'note', color: 'green' }
 ];
 
-/* What the dog says. [dutch, english] */
+/* The game's own voice. [dutch, english] */
 const DOG_LINES = {
-  hello: [['Hallo {name}! Gaan we wandelen?', 'Hello {name}! Shall we go for a walk?'],
-          ['Dag {name}! Ik heb goesting in woorden.', "Hi {name}! I'm in the mood for words."],
-          ['Woef. Dat betekent: kom, we gaan.', "Woof. That means: come on, let's go."]],
+  hello: [['Dag {name}! Klaar voor vandaag?', 'Hi {name}! Ready for today?'],
+          ['Hallo {name}! Zin in woorden?', 'Hello {name}! In the mood for words?'],
+          ['Allez {name}, we gaan.', "Come on {name}, let's go."]],
   due: [['Er wachten {n} woorden op jou.', '{n} words are waiting for you.'],
-        ['{n} woorden willen naar buiten.', '{n} words want to go outside.']],
+        ['{n} woorden willen herhaald worden.', '{n} words want repeating.']],
   done: [['Klaar voor vandaag. Goed bezig!', 'Done for today. Nice going!'],
          ['Amai, jij bent snel. Tot morgen!', "Wow, you're fast. See you tomorrow!"]],
   ok: [['Juist!', 'Correct!'], ['Goed zo!', 'Well done!'], ['Amai!', 'Wow!'], ['Voilà!', 'There you go!'],
-       ['Braaf!', 'Good human!'], ['Top!', 'Great!'], ['Zo is dat!', "That's how it's done!"]],
+       ['Top!', 'Great!'], ['Zo is dat!', "That's how it's done!"]],
   bad: [['Oei.', 'Oops.'], ['Bijna!', 'Almost!'], ['Niet erg.', 'No worries.'], ['Nog eens!', 'Once more!'],
         ['Allez, volgende keer.', 'Come on, next time.']],
   combo: [['{n} op rij!', '{n} in a row!'], ['Amai, {n} op rij!', 'Wow, {n} in a row!']]
