@@ -8,14 +8,16 @@ Play: https://donotwanttohaveaname.github.io/goed-bezig/
 
 ## The concept
 
-Your dog only listens to Dutch. So you walk a route of 14 stops through Flanders, your dog walks with you, and every right answer pays out in wafels.
+Your dog only listens to Dutch. So you walk a route of 14 places through Flanders, your dog walks with you, and every right answer pays out in wafels. Nothing is locked: all 300 words and all 78 sentences are open from the first minute.
 
-- **The route.** 14 places, opened one after the other: eerste woorden, kleine woorden, mensen, doen, thuis, eten & drinken, cijfers, onder vrienden, gevoelens, de hond, de stad, vrije tijd, de agenda, echt Vlaams. A place opens when 80% of the one before it is met.
+- **The route.** 14 places, all open: eerste woorden, kleine woorden, mensen, doen, thuis, eten & drinken, cijfers, onder vrienden, gevoelens, de hond, de stad, vrije tijd, de agenda, echt Vlaams. Tap any place to practise only its words.
+- **De sneltest.** For the words you already know. One tap per word, 30 words a round: pick the meaning or tap "geen idee". What you know jumps straight to "gekend" and comes back a few days later as a typing check, so a lucky guess gets caught. What you do not know goes to the front of the learning queue.
+- **Ken ik al.** Every new-word card has this button. Tap it and you skip the lessons for that word, as long as you can type it.
 - **De wandeling (the daily walk).** The main button. One walk is up to 10 new words plus whatever is due for repetition, about 5 minutes. The pace setting (10, 20 or 30 new words a day) decides how many walks a day make you "done". At 20 a day, all 300 are met in 15 days.
 - **It gets harder as a word gets stronger.** New word card, then pick the meaning, then pick the Dutch, then type it, then recognise it by ear, then type it again. A miss sends the word back a step and brings it round again in the same walk.
 - **Spaced repetition underneath.** A word comes back after 10 minutes, then 1 day, 3 days, 7 days, 21 days. Three states: ontmoet (met), gekend (right three times running), van buiten (by heart).
 - **De of het?** 45 seconds, nouns only, two big buttons. De is always teal, het is always yellow, everywhere in the game.
-- **Zinnen bouwen.** Tap the words into the right order. Sentences use your own words: the bus to Brussels, Aldi on Saturday, pilates on Tuesday, your dog by name.
+- **Zinnen bouwen.** All 78 sentences are open from the start, and every walk ends with two of them. Tap the words into the right order. Sentences use your own words: the bus to Brussels, Aldi on Saturday, pilates on Tuesday, your dog by name.
 - **De baas.** Every place has a boss (de buurvrouw, de kassierster van Aldi, de frituurbaas). 12 questions, 7 seconds each, 3 lives. Beat one and you get its sticker.
 - **Things to collect.** Wafels (points), 8 levels from toerist to echte Vlaming, 27 stickers, a day streak.
 - **Voortgang.** Met, known and by-heart counts, a forecast date, the last 14 days, progress per place, and the words you keep missing.
@@ -39,6 +41,7 @@ Plain HTML, CSS and JavaScript. No build step, no accounts, no server.
 | `js/data.js` | places, words, sentences, levels, stickers, the dog's lines |
 | `js/app.js` | the game: spaced repetition, the walk, all screens |
 | `sw.js` | lets the game open without a connection (network first, cache as fallback) |
+| `backend/Code.gs` | the optional sync backend, an Apps Script that lives inside a Google Sheet (not deployed yet) |
 | `manifest.json`, `img/` | lets you add it to a phone home screen as an app |
 
 Progress lives in the browser of the device you play on (localStorage). Settings has "download a backup" and "restore from a backup" to move it to another device. Nothing is sent anywhere.
@@ -59,3 +62,4 @@ The page is public because GitHub Pages needs a public repository, but it asks s
 | version | date | what changed |
 |---|---|---|
 | 1.0.0 | 2026-11-19 | first playable build: 300 words, 78 sentences, the walk, de of het, zinnen bouwen, 14 bosses, stickers, progress |
+| 1.1.0 | 2026-11-19 | nothing is locked any more: all places and sentences open from the start. New: the sneltest (sort what you already know) and "ken ik al" on new-word cards. Sync code added but switched off until its Google Sheet exists |

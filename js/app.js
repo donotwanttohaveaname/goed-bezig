@@ -1,7 +1,8 @@
 'use strict';
 /* goed bezig: the game. One file, no build step.
    Bump VERSION on every change (and the ?v= in index.html, and CACHE in sw.js). */
-const VERSION = { name: 'GOED BEZIG', v: '1.0.0', date: '2026-11-19', note: 'first playable build' };
+const VERSION = { name: 'GOED BEZIG', v: '1.1.0', date: '2026-11-19', note: 'all 300 open + sneltest' };
+const SYNC_READY = false;   // flips to true once the Google Sheet backend exists
 const KEY = 'goedbezig.v1';
 const DAY = 864e5;
 
@@ -82,7 +83,7 @@ function fresh() {
   return {
     v: 1, name: 'Anna', dog: '', pace: 20, sound: true, voice: true, openAll: false, onboarded: false,
     items: {}, sents: {}, wafels: 0, streak: { n: 0, best: 0, last: '' }, days: {}, stickers: {},
-    dehetBest: 0, zinnen: 0, walks: 0, bestCombo: 0, started: dkey()
+    dehetBest: 0, zinnen: 0, walks: 0, bestCombo: 0, started: dkey(), epoch: 0, setT: 0
   };
 }
 function load() {
@@ -95,11 +96,13 @@ let S = load();
 const box = w => (S.items[w.id] ? S.items[w.id].b : 0);
 function R(w) { return S.items[w.id] || (S.items[w.id] = { b: 0, due: 0, ok: 0, bad: 0 }); }
 const GAPS = [0, 10 * 60e3, DAY, 3 * DAY, 7 * DAY, 21 * DAY];
-function promote(w) { const r = R(w); r.b = Math.min(5, r.b + 1); r.ok++; r.due = r.b <= 1 ? Date.now() + GAPS[1] : dayStart(Date.now()) + GAPS[r.b]; }
-function demote(w) { const r = R(w); r.b = Math.max(1, r.b - 1); r.bad++; r.due = Date.now(); }
+function promote(w) { const r = R(w); r.b = Math.min(5, r.b + 1); r.ok++; r.t = Date.now(); r.due = r.b <= 1 ? Date.now() + GAPS[1] : dayStart(Date.now()) + GAPS[r.b]; }
+function demote(w) { const r = R(w); r.b = Math.max(1, r.b - 1); r.bad++; r.t = Date.now(); r.due = Date.now(); }
 const isMet = w => box(w) >= 1, isKnown = w => box(w) >= 3, isByHeart = w => box(w) >= 4;
 const count = (list, fn) => list.reduce((n, w) => n + (fn(w) ? 1 : 0), 0);
-function placeOpen(p) { return S.openAll || p.index === 0 || count(PLACES[p.index - 1].items, isMet) >= Math.ceil(PLACES[p.index - 1].items.length * 0.8); }
+const placeOpen = () => true;                       // v1.1: every place is open from the start
+const isSorted = w => box(w) >= 1 || !!(S.items[w.id] || {}).s;
+const unsorted = () => WORDS.filter(w => !isSorted(w));
 function today() { return S.days[dkey()] || (S.days[dkey()] = { a: 0, c: 0, n: 0, w: 0 }); }
 function levelIndex(w = S.wafels) { let i = 0; LEVELS.forEach((l, k) => { if (w >= l.at) i = k; }); return i; }
 function dueWords(pool = WORDS) { const now = Date.now(); return pool.filter(w => { const r = S.items[w.id]; return r && r.b >= 1 && r.due <= now; }); }
@@ -162,6 +165,138 @@ function confetti() {
   })(t0);
 }
 
+/* --------------------------------------------------------------------- sync
+   Optional. A device is linked with a sync code (web app id ~ secret). Every sync is
+   pull, merge, push: words keep whichever device answered last, counters add up what
+   each device earned since its last sync, so two devices never overwrite each other. */
+let syncBusy = false, syncQueued = false, syncErr = '', syncTimer = null;
+const recentDay = k => k >= dkey(new Date(Date.now() - 2 * DAY));
+function syncUrl() { return (location.hostname === 'localhost' && localStorage.getItem('goedbezig.testSyncUrl')) || `https://script.google.com/macros/s/${S.sync.id}/exec`; }
+function stripSync(st) { const o = Object.assign({}, st); delete o.sync; return o; }
+function snapshot(st) {
+  const days = {};
+  Object.keys(st.days || {}).filter(recentDay).forEach(k => { days[k] = Object.assign({}, st.days[k]); });
+  return { wafels: st.wafels || 0, zinnen: st.zinnen || 0, walks: st.walks || 0, days };
+}
+function newer(a, b) {
+  const ta = a.t || 0, tb = b.t || 0;
+  return ta !== tb ? ta > tb : ((a.ok || 0) + (a.bad || 0) + (a.b || 0)) >= ((b.ok || 0) + (b.bad || 0) + (b.b || 0));
+}
+function runOfDays(days, last) {
+  let n = 0, d = new Date(last + 'T12:00:00');
+  while (days[dkey(d)] && days[dkey(d)].a > 0) { n++; d = new Date(d.getTime() - DAY); }
+  return n;
+}
+function mergeState(L, Rm, base) {
+  if (!Rm || typeof Rm !== 'object' || typeof Rm.items !== 'object') return Object.assign({}, L);
+  if ((Rm.epoch || 0) !== (L.epoch || 0)) {          // one side started over or restored a backup: the newest of those wins whole
+    return (Rm.epoch || 0) > (L.epoch || 0) ? Object.assign(fresh(), Rm, { sound: L.sound, voice: L.voice, sync: L.sync }) : Object.assign({}, L);
+  }
+  base = base || {};
+  const o = Object.assign({}, L), plus = (x, b0) => Math.max(0, (x || 0) - (b0 || 0));
+  ['items', 'sents'].forEach(k => {
+    const m = Object.assign({}, Rm[k] || {});
+    Object.keys(L[k] || {}).forEach(id => { if (!m[id] || newer(L[k][id], m[id])) m[id] = L[k][id]; });
+    o[k] = m;
+  });
+  ['wafels', 'zinnen', 'walks'].forEach(k => { o[k] = (Rm[k] || 0) + plus(L[k], base[k]); });
+  const days = {}, bd = base.days || {};
+  Object.keys(Rm.days || {}).forEach(k => { days[k] = Object.assign({}, Rm.days[k]); });
+  Object.keys(L.days || {}).forEach(k => {
+    const l = L.days[k], r = days[k];
+    if (!r) { days[k] = Object.assign({}, l); return; }
+    const sum = (k in bd) || recentDay(k);
+    ['a', 'c', 'n', 'w'].forEach(x => { r[x] = sum ? (r[x] || 0) + plus(l[x], (bd[k] || {})[x]) : Math.max(r[x] || 0, l[x] || 0); });
+  });
+  o.days = days;
+  o.dehetBest = Math.max(L.dehetBest || 0, Rm.dehetBest || 0);
+  o.bestCombo = Math.max(L.bestCombo || 0, Rm.bestCombo || 0);
+  const ls = L.streak || {}, rs = Rm.streak || {}, last = [ls.last || '', rs.last || ''].sort()[1];
+  const pick = (rs.last || '') === last && (rs.n || 0) >= ((ls.last || '') === last ? (ls.n || 0) : 0) ? rs : ls;
+  const n = last ? Math.max(pick.n || 0, runOfDays(days, last)) : 0;
+  o.streak = { n, last, best: Math.max(ls.best || 0, rs.best || 0, n) };
+  o.stickers = Object.assign({}, Rm.stickers || {});
+  Object.keys(L.stickers || {}).forEach(k => { if (!o.stickers[k] || L.stickers[k] < o.stickers[k]) o.stickers[k] = L.stickers[k]; });
+  if ((Rm.setT || 0) > (L.setT || 0) || (!L.onboarded && Rm.onboarded)) ['name', 'dog', 'pace', 'openAll', 'setT'].forEach(k => { if (k in Rm) o[k] = Rm[k]; });
+  o.onboarded = !!(L.onboarded || Rm.onboarded);
+  o.started = [L.started, Rm.started].filter(Boolean).sort()[0] || dkey();
+  return o;
+}
+function sheetSummary(st) {
+  const b = w => (st.items[w.id] || {}).b || 0, d = (st.days || {})[dkey()] || {};
+  return { date: dkey(), met: count(WORDS, w => b(w) >= 1), known: count(WORDS, w => b(w) >= 3), byHeart: count(WORDS, w => b(w) >= 4),
+    wafels: st.wafels || 0, level: LEVELS[levelIndex(st.wafels || 0)].nl, streak: (st.streak || {}).n || 0, answers: d.a || 0, right: d.c || 0,
+    device: matchMedia('(pointer:coarse)').matches ? 'phone' : 'computer' };
+}
+function sheetWords(st) {
+  return WORDS.map(w => { const r = st.items[w.id] || {}, b = r.b || 0;
+    return [w.place.nl, w.nl, w.en, b, b >= 4 ? 'by heart' : b >= 3 ? 'known' : b >= 1 ? 'met' : 'new', r.ok || 0, r.bad || 0, b >= 1 && r.due ? dkey(new Date(r.due)) : '']; });
+}
+const fingerprint = st => [st.wafels, Object.keys(st.items).length, Object.values(st.items).reduce((t, r) => t + (r.b || 0), 0), (st.streak || {}).n, st.name, st.dog, st.pace, st.openAll, Object.keys(st.stickers).length, st.onboarded].join('|');
+async function syncCall(body) {
+  let r;
+  try { r = await fetch(syncUrl(), { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({ key: S.sync.key }, body)) }); }
+  catch (e) { throw new Error('no connection'); }
+  if (!r.ok) throw new Error('the Sheet did not answer (' + r.status + ')');
+  let j; try { j = await r.json(); } catch (e) { throw new Error('the Sheet sent something unexpected'); }
+  if (!j.ok && !j.conflict) throw new Error(j.error || 'sync failed');
+  return j;
+}
+async function syncNow() {
+  if (!S.sync) return false;
+  if (syncBusy) { syncQueued = true; return false; }
+  syncBusy = true; syncErr = ''; paintSync();
+  let done = false;
+  try {
+    let remote = await syncCall({ action: 'pull' });
+    for (let i = 0; i < 4 && !done; i++) {
+      const snap0 = snapshot(S), merged = mergeState(S, remote.state, S.sync.base);
+      const res = await syncCall({ action: 'push', baseRev: remote.rev, state: stripSync(merged), summary: sheetSummary(merged), words: sheetWords(merged) });
+      if (res.conflict) { remote = res; continue; }
+      if (!S.sync) return false;                      // unlinked while the request was out
+      const before = fingerprint(S);
+      const fin = mergeState(S, merged, snap0);        // keeps whatever was played while the request was out
+      fin.sync = Object.assign({}, S.sync, { rev: res.rev, at: Date.now(), base: snapshot(merged) });
+      S = fin; save(); done = true;
+      if (fingerprint(S) !== before) {
+        if (['home', 'progress', 'stickers', 'place'].includes(view.name)) { const y = window.scrollY; go(view.name, view.arg); window.scrollTo(0, y); }
+        else if (view.name === 'hello' && S.onboarded) go('home');
+      }
+    }
+    if (!done) throw new Error('the Sheet was busy, will try again');
+  } catch (e) { syncErr = e.message || 'sync failed'; }
+  syncBusy = false; paintSync();
+  if (syncQueued) { syncQueued = false; syncSoon(); }
+  return done;
+}
+function syncSoon() { if (!S.sync) return; clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 1200); }
+function syncText() {
+  if (syncBusy) return 'Syncing with your Google Sheet…';
+  if (syncErr) return `Sync did not work just now: ${esc(syncErr)}. Your progress is safe on this device and goes up at the next try.`;
+  if (!S.sync.at) return 'Linked. Not synced yet.';
+  const m = Math.round((Date.now() - S.sync.at) / 60000);
+  return `Linked to your Google Sheet. Last synced ${m < 1 ? 'just now' : m < 60 ? m + (m === 1 ? ' minute ago' : ' minutes ago') : new Date(S.sync.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.`;
+}
+function paintSync() {
+  document.body.dataset.sync = !S.sync ? 'off' : syncBusy ? 'busy' : syncErr ? 'error' : 'ok';
+  const el = $('#syncStatus'); if (el && S.sync) el.innerHTML = syncText();
+}
+function parseCode(str) { const m = String(str).trim().match(/(?:#sync=)?([A-Za-z0-9_-]{30,})~([A-Za-z0-9]{24,})$/); return m ? { id: m[1], key: m[2] } : null; }
+function linkDevice(c) { S.sync = { id: c.id, key: c.key, rev: 0, at: 0, base: {} }; save(); paintSync(); }
+function syncBlock() {
+  if (!S.sync) return `<h2 class="h">sync</h2>
+    <p class="fine pad">Same progress on your phone and your laptop, kept in your own Google Sheet. Paste your sync code to link this device.</p>
+    <form class="set" data-form="link"><label>sync code<input name="code" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="paste it here"></label>
+      <button class="btn btn-ghost">link this device</button></form>`;
+  return `<h2 class="h">sync</h2>
+    <p class="fine pad" id="syncStatus">${syncText()}</p>
+    <div class="actions">
+      <button class="btn btn-ghost" data-act="syncnow">sync now</button>
+      <button class="btn btn-ghost" data-act="synccode">copy the sync code for another device</button>
+      <button class="btn btn-clear danger" data-act="unlink">unlink this device</button>
+    </div>`;
+}
+
 /* ------------------------------------------------------------------- router */
 let view = { name: 'home', arg: null };
 let timers = [], ticker = null;
@@ -200,6 +335,7 @@ VIEWS.home = () => {
   let line, cta, sub, act = 'walk';
   if (plan.due + plan.fresh > 0) {
     line = plan.due > 0 && Math.random() < 0.6 ? fillLine(rnd(DOG_LINES.due), { n: plan.due }) : fillLine(rnd(DOG_LINES.hello));
+    if (!Object.keys(S.items).length) line = ['Ken je al woorden? Doe eerst de sneltest.', 'Know some words already? Do the quick test first.'];
     cta = 'start de wandeling';
     sub = [plan.due ? `${Math.min(plan.due, 24)} to repeat` : '', plan.fresh ? `${plan.fresh} new` : ''].filter(Boolean).join(', ');
   } else if (plan.unmet > 0) {
@@ -227,8 +363,9 @@ VIEWS.home = () => {
     <p class="fine">${next ? `${next.at - S.wafels} wafels to go until <b>${next.nl}</b>` : 'the top of the ladder. amai.'}</p>
   </section>
   <div class="duo">
+    ${unsorted().length ? `<button class="tile band c-cyan" data-act="sorteer"><span><h3>sneltest</h3><p>know some already? one tap per word sorts all 300</p></span><span class="rec">${300 - unsorted().length}/300</span></button>` : ''}
     <button class="tile c-teal" data-act="dehet"><h3>de of het?</h3><p>45 seconds of nouns</p><span class="rec">record ${S.dehetBest}</span></button>
-    <button class="tile c-yellow" data-act="zinnen"><h3>zinnen bouwen</h3><p>put the words in order</p><span class="rec">${S.zinnen} built</span></button>
+    <button class="tile c-yellow" data-act="zinnen"><h3>zinnen bouwen</h3><p>78 sentences, all open</p><span class="rec">${S.zinnen} built</span></button>
   </div>
   <h2 class="h">de route</h2>
   <ol class="route">${PLACES.map(p => placeCard(p, current)).join('')}</ol>
@@ -237,13 +374,8 @@ VIEWS.home = () => {
 };
 function fillLine(l, extra) { return [fill(l[0], extra), fill(l[1], extra)]; }
 function placeCard(p, current) {
-  const open = placeOpen(p), met = count(p.items, isMet), tot = p.items.length;
+  const met = count(p.items, isMet), tot = p.items.length;
   const won = S.stickers['boss:' + p.id];
-  if (!open) {
-    const prev = PLACES[p.index - 1], need = Math.ceil(prev.items.length * 0.8) - count(prev.items, isMet);
-    return `<li><button class="place locked" data-act="locked" data-need="${need}" data-prev="${esc(prev.nl)}">
-      <span class="pi">${icon('lock')}</span><span class="pt"><b>${esc(p.nl)}</b><small>${need} more words in ${esc(prev.nl)}</small></span></button></li>`;
-  }
   return `<li><button class="place c-${p.color}" data-act="place" data-id="${p.id}">
     <span class="pi">${icon(p.icon)}</span>
     <span class="pt"><b>${esc(p.nl)}</b><small>${esc(p.en)}</small></span>
@@ -291,17 +423,18 @@ function qFor(w) {
   if (b === 4 && voice) return { t: 'listen', w };
   return { t: 'type', w };
 }
-function pickSentences(places, n) {
-  const now = Date.now();
-  const pool = SENTS.filter(s => places.includes(s.place) && count(s.place.items, isMet) >= s.place.items.length * 0.5)
-    .filter(s => { const r = S.sents[s.id]; return !r || r.due <= now; });
-  return shuffle(pool).sort((a, b) => ((S.sents[a.id] || {}).b || 0) - ((S.sents[b.id] || {}).b || 0)).slice(0, n);
+function pickSentences(places, n, any) {
+  const now = Date.now(), sb = x => (S.sents[x.id] || {}).b || 0;
+  const ready = x => (count(x.place.items, isMet) >= x.place.items.length * 0.5 ? 0 : 1);
+  const pool = SENTS.filter(x => places.includes(x.place)).filter(x => any || !S.sents[x.id] || S.sents[x.id].due <= now);
+  return shuffle(pool).sort((a, b) => ready(a) - ready(b) || sb(a) - sb(b) || (any ? 0 : a.place.index - b.place.index)).slice(0, n);
 }
 function buildWalk(opts = {}) {
   const pool = opts.place ? opts.place.items : WORDS;
   let reviews = shuffle(dueWords(pool).sort((a, b) => S.items[a.id].due - S.items[b.id].due).slice(0, 24));
   const quota = (opts.place || opts.extra) ? 10 : Math.max(0, Math.min(10, S.pace - today().n));
-  const fresh = pool.filter(w => !isMet(w)).slice(0, quota);
+  const flagged = w => ((S.items[w.id] || {}).s ? 0 : 1);   // words the sneltest marked as unknown come first
+  const fresh = pool.filter(w => !isMet(w)).sort((a, b) => flagged(a) - flagged(b)).slice(0, quota);
   const steps = [];
   let free = [];
   if (!reviews.length && !fresh.length) {           // nothing due, nothing new: practise the shakiest words for fun
@@ -317,7 +450,7 @@ function buildWalk(opts = {}) {
   }
   reviews.forEach(w => steps.push(qFor(w)));
   shuffle(fresh).forEach(w => steps.push({ t: 'mc', dir: 'en-nl', w }));
-  const places = opts.place ? [opts.place] : PLACES.filter(placeOpen);
+  const places = opts.place ? [opts.place] : PLACES;
   pickSentences(places, opts.place ? 3 : 2).forEach(s => steps.push({ t: 'sent', s }));
   return steps;
 }
@@ -363,7 +496,7 @@ function renderIntro(step) {
       <h1 class="word ${sizeCls(w.nl)}">${wordHTML(w)}</h1>
       <p class="mean">${esc(w.en)}</p>
       ${hearBtn(w.nl, true)}
-    </div>`, { cls: 'is-intro', color: w.place.color, foot: '<button class="btn btn-white wide" data-act="gotit">hebbes<em>got it</em></button>' });
+    </div>`, { cls: 'is-intro', color: w.place.color, foot: '<div class="pair"><button class="btn btn-clear wide" data-act="knowit">ken ik al<em>I know this one</em></button><button class="btn btn-white wide" data-act="gotit">hebbes<em>got it</em></button></div>' });
   say(w.nl);
 }
 
@@ -380,11 +513,12 @@ function renderMC(step) {
   const prompt = listen
     ? `<p class="ask">luister <span>listen, then pick</span></p>${hearBtn(w.nl, true)}`
     : nlFirst
-      ? `<p class="ask">wat betekent <span>what does it mean</span></p><h1 class="word ${sizeCls(w.nl)}">${wordHTML(w)}</h1>${hearBtn(w.nl)}`
+      ? `<p class="ask">${ses.mode === 'sort' ? 'ken je dit al? <span>do you know this one</span>' : 'wat betekent <span>what does it mean</span>'}</p><h1 class="word ${sizeCls(w.nl)}">${wordHTML(w)}</h1>${hearBtn(w.nl)}`
       : `<p class="ask">hoe zeg je <span>how do you say</span></p><h1 class="word ${sizeCls(w.en)}">${esc(w.en)}</h1>`;
   $('#ses').innerHTML = chrome(`
     <div class="prompt">${prompt}</div>
-    <div class="opts">${cur.opts.map((o, i) => `<button class="opt" data-act="opt" data-i="${i}"><kbd>${i + 1}</kbd><span>${nlFirst ? esc(o.en) : wordHTML(o)}</span></button>`).join('')}</div>`);
+    <div class="opts">${cur.opts.map((o, i) => `<button class="opt" data-act="opt" data-i="${i}"><kbd>${i + 1}</kbd><span>${nlFirst ? esc(o.en) : wordHTML(o)}</span></button>`).join('')}</div>`,
+    ses.mode === 'sort' ? { foot: '<button class="btn btn-ghost wide" data-act="noidea">geen idee<em>no idea, teach me</em></button>' } : {});
   if (nlFirst) say(w.nl);
 }
 function onOpt(i) {
@@ -422,7 +556,7 @@ function judge(w, input) {
 function renderType(step) {
   const w = step.w;
   $('#ses').innerHTML = chrome(`
-    <div class="prompt"><p class="ask">typ het in het Nederlands <span>type it in Dutch</span></p>
+    <div class="prompt"><p class="ask">${step.prove ? 'bewijs het <span>prove it: type it in Dutch</span>' : 'typ het in het Nederlands <span>type it in Dutch</span>'}</p>
       <h1 class="word ${sizeCls(w.en)}">${esc(w.en)}</h1></div>
     <form class="typer" data-form="type" autocomplete="off">
       <input id="ans" type="text" lang="nl" inputmode="text" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false" enterkeyhint="done" placeholder="${w.art ? 'de of het …' : '…'}" aria-label="your answer in Dutch">
@@ -489,18 +623,27 @@ function resolve(right, pts, info = {}) {
     showFb(right, w, s, info); return;
   }
   const d = today(); d.a++;
-  if (w && box(w) === 0) { d.n++; ses.newN++; }      // first real answer on a word = it counts as met today
+  if (ses.mode === 'sort') {                          // the sneltest only sorts: known words jump ahead, the rest wait to be taught
+    const r = R(w); r.s = 1; r.t = Date.now();
+    if (right) { r.b = 3; r.ok++; r.due = dayStart(Date.now()) + (1 + Math.floor(Math.random() * 3)) * DAY; ses.ok++; ses.w++; S.wafels++; d.c++; d.w++; sfx.ok(); buzz(12); }
+    else { ses.bad++; sfx.tap(); }
+    save();
+    const c0 = $('#sesW b'); if (c0) c0.textContent = ses.w;
+    showFb(right, w, null, info, right ? 1 : 0); return;
+  }
+  if (w && box(w) === 0 && !step.prove) { d.n++; ses.newN++; }   // first real answer on a word = it counts as met today
   if (right) {
     ses.ok++; ses.combo++; ses.maxCombo = Math.max(ses.maxCombo, ses.combo);
     if (ses.combo >= 5) pts += 1;
     ses.w += pts; S.wafels += pts; d.c++; d.w += pts;
-    if (w && !step.retry && !step.free && info.note !== 'wrongart') promote(w);
-    if (s) { const r = S.sents[s.id] || (S.sents[s.id] = { b: 0, due: 0 }); r.b = Math.min(5, r.b + 1); r.due = dayStart(Date.now()) + GAPS[Math.max(2, r.b)]; S.zinnen++; ses.sents++; }
+    if (w && !step.retry && !step.free && info.note !== 'wrongart') { if (step.prove) R(w).b = Math.max(R(w).b, 2); promote(w); }
+    if (s) { const r = S.sents[s.id] || (S.sents[s.id] = { b: 0, due: 0 }); r.b = Math.min(5, r.b + 1); r.t = Date.now(); r.due = dayStart(Date.now()) + GAPS[Math.max(2, r.b)]; S.zinnen++; ses.sents++; }
     sfx.ok(); buzz(12);
   } else {
     ses.bad++; ses.combo = 0;
+    if (step.prove && !step.retry) { d.n++; ses.newN++; }
     if (w && !step.retry) demote(w);
-    if (s) { const r = S.sents[s.id] || (S.sents[s.id] = { b: 0, due: 0 }); r.b = Math.max(0, r.b - 1); r.due = Date.now(); }
+    if (s) { const r = S.sents[s.id] || (S.sents[s.id] = { b: 0, due: 0 }); r.b = Math.max(0, r.b - 1); r.t = Date.now(); r.due = Date.now(); }
     ses.steps.splice(Math.min(ses.steps.length, ses.i + 4), 0, Object.assign({}, step, { retry: true }));
     sfx.bad(); buzz(60);
   }
@@ -515,6 +658,8 @@ function showFb(right, w, s, info, pts) {
   let line = rnd(DOG_LINES[right ? 'ok' : 'bad']);
   if (right && ses.mode !== 'boss' && (ses.combo === 5 || ses.combo === 10 || ses.combo === 20)) line = fillLine(rnd(DOG_LINES.combo), { n: ses.combo });
   if (info.timeout) line = ['Te laat!', 'Too slow!'];
+  if (ses.mode === 'sort' && !right) line = ['Die leren we.', "We'll learn that one."];
+  if (ses.mode === 'sort' && right) line = rnd([['Ken je al!', 'You know it!'], ['Die heb je.', 'Got that one.'], ['Juist!', 'Correct!']]);
   let detail = '';
   const answer = s ? `<p class="fix">${esc(fill(s.nl))}</p>` : `<p class="fix">${wordHTML(w)} <span>= ${esc(w.en)}</span></p>`;
   if (!right) detail = answer;
@@ -528,7 +673,7 @@ function showFb(right, w, s, info, pts) {
   fb.innerHTML = `<div class="fb-in"><div class="fb-txt"><b>${esc(line[0])}</b><small>${esc(line[1])}${right && pts ? ` · +${pts} ${pts === 1 ? 'wafel' : 'wafels'}` : ''}</small>${detail}</div>
     <button type="button" class="btn btn-white" data-act="next">verder</button></div>`;
   const tb = $('#typerBtns'); if (tb) tb.hidden = true;
-  if (!slow) later(next, 800); else if (right) later(next, 2600); else if (ses.mode === 'boss') later(next, 1700);
+  if (!slow) later(next, 800); else if (right) later(next, 2600); else if (ses.mode === 'boss') later(next, 1700); else if (ses.mode === 'sort') later(next, 1500);
 }
 function next() {
   if (!ses || !cur || !cur.done) return;
@@ -537,6 +682,13 @@ function next() {
   if (ses.mode === 'boss' && ses.lives <= 0) return endBoss(false);
   if (ses.i >= ses.steps.length) return ses.mode === 'boss' ? endBoss(true) : finish();
   renderStep();
+}
+function onKnowIt() {                               // skip the lessons for this word, but prove it by typing
+  if (!cur || cur.step.t !== 'intro') return;
+  const w = cur.step.w;
+  ses.steps = ses.steps.filter((x, k) => k <= ses.i || x.w !== w);
+  ses.steps.splice(ses.i + 1, 0, { t: 'type', w, prove: true });
+  sfx.tap(); cur.done = true; next();
 }
 function onGotIt() {
   if (cur.step.t !== 'intro') return;
@@ -554,7 +706,7 @@ function checkStickers(flags = {}) {
   return got;
 }
 function finish() {
-  const answered = ses.ok + ses.bad, perfect = ses.bad === 0 && ses.ok >= 8;
+  const answered = ses.ok + ses.bad, perfect = ses.mode !== 'sort' && ses.bad === 0 && ses.ok >= 8;
   let bonus = 0;
   if (answered >= 5 && (ses.mode === 'walk' || ses.mode === 'place')) { bonus = perfect ? 10 : 5; S.walks++; }
   S.wafels += bonus; today().w += bonus; ses.w += bonus;
@@ -562,12 +714,28 @@ function finish() {
   const got = checkStickers({ perfect });
   const opened = PLACES.filter(p => placeOpen(p) && !ses.openBefore.includes(p.id));
   const lvlUp = levelIndex() > ses.levelBefore;
-  save();
+  save(); syncSoon();
   go('summary', { got, opened, lvlUp, bonus, perfect });
 }
 VIEWS.summary = d => {
   const answered = ses.ok + ses.bad, acc = answered ? Math.round(100 * ses.ok / answered) : 100, lvl = LEVELS[levelIndex()];
   const plan = walkPlan();
+  if (ses.mode === 'sort') {
+    const left = unsorted().length;
+    return `<div class="sum">
+      <div class="sum-top c-cyan">${dogSVG('happy')}<h1>gesorteerd!</h1><p>What you knew comes back in a few days as a typing check.</p></div>
+      <div class="chips">
+        <div class="chip c-green"><b>${ses.ok}</b><span>you know already</span></div>
+        <div class="chip c-yellow"><b>${ses.bad}</b><span>to learn</span></div>
+        <div class="chip c-pink"><b>${300 - left}</b><span>of 300 sorted</span></div>
+        <div class="chip c-teal"><b>${count(WORDS, isMet)}</b><span>words known so far</span></div>
+      </div>
+      ${d.got.map(s => `<div class="news c-${s.color}"><b>sticker: ${esc(s.nl)}</b><span>${esc(s.en)}</span></div>`).join('')}
+      <div class="dock stackd">
+        ${left ? `<button class="btn btn-pink wide" data-act="sorteer">nog een rondje<em>${left} words left to sort</em></button>` : `<button class="btn btn-pink wide" data-act="walk">start de wandeling<em>everything is sorted, time to learn</em></button>`}
+        <button class="btn btn-ghost wide" data-act="go" data-to="home">klaar voor nu</button>
+      </div></div>`;
+  }
   const head = d.perfect ? 'foutloos!' : acc >= 80 ? 'goed bezig!' : 'allez, het komt.';
   const headEn = d.perfect ? 'not one mistake' : acc >= 80 ? 'nice going' : "come on, it's coming";
   return `<div class="sum">
@@ -579,7 +747,6 @@ VIEWS.summary = d => {
       <div class="chip c-orange"><b>${liveStreak()}</b><span>${liveStreak() === 1 ? 'day' : 'days'} in a row</span></div>
     </div>
     ${d.lvlUp ? `<div class="news c-cyan"><b>nieuw niveau: ${lvl.nl}</b><span>new level: ${lvl.en}</span></div>` : ''}
-    ${d.opened.map(p => `<div class="news c-${p.color}"><b>nieuwe plek: ${esc(p.nl)}</b><span>a new stop on the route: ${esc(p.en)}</span></div>`).join('')}
     ${d.got.map(s => `<div class="news c-${s.color}"><b>sticker: ${esc(s.nl)}</b><span>${esc(s.en)}</span></div>`).join('')}
     <div class="dock stackd">
       <button class="btn btn-pink wide" data-act="${plan.due + plan.fresh > 0 ? 'walk' : 'extra'}">nog een rondje<em>${plan.due + plan.fresh > 0 ? `${Math.min(plan.due, 24) + plan.fresh} words ready` : 'ahead of schedule: 10 extra'}</em></button>
@@ -609,7 +776,7 @@ function startBoss(id) {
 function endBoss(won) {
   const p = ses.place; let fresh = false;
   if (won) { fresh = !S.stickers['boss:' + p.id]; S.stickers['boss:' + p.id] = S.stickers['boss:' + p.id] || dkey(); S.wafels += 15; today().w += 15; }
-  touchStreak(); save();
+  touchStreak(); save(); syncSoon();
   go('bossend', { won, fresh, id: p.id });
 }
 VIEWS.bossend = d => {
@@ -667,7 +834,7 @@ function endDeHet() {
   const earned = Math.floor(dh.score / 2), record = dh.score > S.dehetBest;
   S.dehetBest = Math.max(S.dehetBest, dh.score); S.wafels += earned; today().w += earned; today().a += dh.score + dh.miss; today().c += dh.score;
   if (dh.score + dh.miss >= 5) touchStreak();
-  const got = checkStickers(); save();
+  const got = checkStickers(); save(); syncSoon();
   go('dhend', { earned, record, got });
 }
 VIEWS.dhend = d => `<div class="boss c-teal">
@@ -732,10 +899,10 @@ VIEWS.settings = () => `
     <fieldset><legend>new words a day</legend><div class="seg">${[[10, 'rustig'], [20, 'stevig'], [30, 'turbo']].map(([n, l]) => `<label><input type="radio" name="pace" value="${n}" ${S.pace === n ? 'checked' : ''}><span><b>${n}</b>${l}</span></label>`).join('')}</div></fieldset>
     <label class="tog"><input type="checkbox" name="sound" ${S.sound ? 'checked' : ''}><span>sounds and buzz</span></label>
     <label class="tog"><input type="checkbox" name="voice" ${S.voice ? 'checked' : ''}><span>say words out loud ${voice ? `(${esc(voice.name)}, ${esc(voice.lang)})` : '(no Dutch voice on this device)'}</span></label>
-    <label class="tog"><input type="checkbox" name="openAll" ${S.openAll ? 'checked' : ''}><span>open every place on the route now</span></label>
   </form>
-  <h2 class="h">je voortgang bewaren</h2>
-  <p class="fine pad">Progress lives in this browser on this device. Save a backup file now and then, or to move to another device.</p>
+  ${SYNC_READY || S.sync ? syncBlock() : ''}
+  <h2 class="h">een kopie bewaren</h2>
+  <p class="fine pad">${S.sync ? 'Sync already keeps a copy in your Google Sheet. A backup file is an extra one you hold yourself.' : 'Progress lives in this browser on this device. Save a backup file now and then.'}</p>
   <div class="actions">
     <button class="btn btn-ghost" data-act="export">download a backup</button>
     <button class="btn btn-ghost" data-act="import">restore from a backup</button>
@@ -765,17 +932,13 @@ const ACT = {
   walk: () => startSession(buildWalk(), { mode: 'walk' }),
   extra: () => startSession(buildWalk({ extra: true }), { mode: 'walk' }),
   practise: d => { const p = PLACES.find(x => x.id === d.id); startSession(buildWalk({ place: p }), { mode: 'place', place: p, color: p.color }); },
-  zinnen: () => {
-    const open = PLACES.filter(placeOpen);
-    let pool = SENTS.filter(s => open.includes(s.place) && count(s.place.items, isMet) >= s.place.items.length * 0.5);
-    if (!pool.length) pool = PLACES[0].sents;
-    const steps = shuffle(pool).sort((a, b) => ((S.sents[a.id] || {}).b || 0) - ((S.sents[b.id] || {}).b || 0)).slice(0, 6).map(s => ({ t: 'sent', s }));
-    startSession(steps, { mode: 'zinnen', color: 'yellow' });
-  },
+  zinnen: () => startSession(pickSentences(PLACES, 6, true).map(x => ({ t: 'sent', s: x })), { mode: 'zinnen', color: 'yellow' }),
+  sorteer: () => startSession(unsorted().slice(0, 30).map(w => ({ t: 'mc', dir: 'nl-en', w })), { mode: 'sort', color: 'cyan' }),
+  noidea: () => { if (cur && !cur.done && ses.mode === 'sort') { document.querySelectorAll('.opt').forEach((b, k) => { b.disabled = true; if (cur.opts[k] === cur.step.w) b.classList.add('right'); }); resolve(false, 0, { noidea: true }); } },
+  knowit: () => onKnowIt(),
   dehet: () => startDeHet(),
   dh: d => onDh(d.a),
   place: d => go('place', d.id),
-  locked: d => toast(`Meet ${d.need} more ${d.need === '1' ? 'word' : 'words'} in “${d.prev}” to open this stop.`),
   boss: d => go('bossintro', d.id),
   bossgo: d => startBoss(d.id),
   say: d => { say(d.text, true); if (!voice) toast('No Dutch voice on this device.'); },
@@ -786,14 +949,26 @@ const ACT = {
   pick: d => { const x = cur.tiles[+d.i]; if (cur.done || x.used) return; x.used = true; cur.picked.push(x.i); sfx.tap(); drawTiles(); },
   unpick: d => { if (cur.done) return; const i = +d.i; cur.tiles[i].used = false; cur.picked = cur.picked.filter(k => k !== i); drawTiles(); },
   checksent: () => onCheckSent(),
-  quit: () => { const b = ses && ses.mode === 'boss'; if (ses && ses.mode !== 'boss' && ses.ok + ses.bad >= 3) { touchStreak(); checkStickers(); save(); } b ? go('place', ses.place.id) : go('home'); },
+  quit: () => { const b = ses && ses.mode === 'boss'; if (ses && ses.mode !== 'boss' && ses.ok + ses.bad >= 3) { touchStreak(); checkStickers(); save(); syncSoon(); } b ? go('place', ses.place.id) : go('home'); },
+  syncnow: () => { syncNow().then(ok => toast(ok ? 'Synced.' : syncErr ? 'Sync did not work: ' + syncErr : 'Already syncing.')); },
+  synccode: () => {
+    const code = S.sync.id + '~' + S.sync.key;
+    const ok = () => toast('Sync code copied. Paste it under instellingen on your other device.');
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(ok, () => prompt('Copy this sync code:', code)); else prompt('Copy this sync code:', code);
+  },
+  unlink: () => { if (confirm('Unlink this device? Your progress stays here and in your Google Sheet, it just stops syncing from this device.')) { delete S.sync; syncErr = ''; save(); go('settings'); } },
   export: () => {
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 1)], { type: 'application/json' }));
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(stripSync(S), null, 1)], { type: 'application/json' }));
     a.download = `goed-bezig-backup-${dkey()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   },
   import: () => $('#importFile').click(),
-  reset: () => { if (confirm('Start over from zero? This wipes every word, wafel and sticker on this device.')) { S = fresh(); save(); go('hello'); } }
+  reset: () => {
+    if (!confirm('Start over from zero? This wipes every word, wafel and sticker on this device' + (S.sync ? ', and at the next sync on your other devices and in your Google Sheet too.' : '.'))) return;
+    const sync = S.sync; S = fresh(); S.epoch = Date.now();
+    if (sync) S.sync = Object.assign({}, sync, { base: {} });
+    save(); go('hello'); syncSoon();
+  }
 };
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el || el.disabled) return;
@@ -805,7 +980,13 @@ document.addEventListener('submit', e => {
   if (f.dataset.form === 'hello') {
     const fd = new FormData(f);
     S.name = (fd.get('name') || '').trim() || 'Anna'; S.dog = (fd.get('dog') || '').trim() || 'Wafel'; S.pace = +fd.get('pace') || 20;
-    S.onboarded = true; save(); sfx.win(); go('home');
+    S.onboarded = true; S.setT = Date.now(); save(); sfx.win(); go('home'); syncSoon();
+  }
+  if (f.dataset.form === 'link') {
+    const c = parseCode(new FormData(f).get('code') || '');
+    if (!c) { toast('That does not look like a sync code.'); return; }
+    linkDevice(c); go('settings');
+    syncNow().then(ok => toast(ok ? 'Linked and synced.' : 'Linked, but the first sync did not work: ' + syncErr));
   }
 });
 document.addEventListener('change', e => {
@@ -813,12 +994,12 @@ document.addEventListener('change', e => {
   if (f) {
     const fd = new FormData(f);
     S.name = (fd.get('name') || '').trim() || 'Anna'; S.dog = (fd.get('dog') || '').trim() || 'Wafel'; S.pace = +fd.get('pace') || 20;
-    S.sound = !!fd.get('sound'); S.voice = !!fd.get('voice'); S.openAll = !!fd.get('openAll'); save(); toast('Saved.');
+    S.sound = !!fd.get('sound'); S.voice = !!fd.get('voice'); S.setT = Date.now(); save(); toast('Saved.'); syncSoon();
   }
   if (e.target.id === 'importFile' && e.target.files[0]) {
     const r = new FileReader();
     r.onload = () => {
-      try { const d = JSON.parse(r.result); if (!d || typeof d.items !== 'object' || typeof d.wafels !== 'number') throw new Error('shape'); S = Object.assign(fresh(), d); save(); toast('Backup restored.'); go('home'); }
+      try { const d = JSON.parse(r.result); if (!d || typeof d.items !== 'object' || typeof d.wafels !== 'number') throw new Error('shape'); const sync = S.sync; S = Object.assign(fresh(), d, { epoch: Date.now() }); delete S.sync; if (sync) S.sync = Object.assign({}, sync, { base: {} }); save(); toast('Backup restored.'); go('home'); syncSoon(); }
       catch (err) { toast('That file is not a goed bezig backup.'); }
     };
     r.readAsText(e.target.files[0]);
@@ -833,4 +1014,15 @@ document.addEventListener('keydown', e => {
 
 /* --------------------------------------------------------------------- boot */
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+(function linkFromAddress() {                       // a link ending in #sync=<code> links this device, then the code leaves the address bar
+  const m = location.hash.match(/^#sync=(.+)$/); if (!m) return;
+  history.replaceState(null, '', location.pathname + location.search);
+  const c = parseCode(decodeURIComponent(m[1]));
+  if (!c || (S.sync && S.sync.id === c.id && S.sync.key === c.key)) return;
+  if (confirm('Link this device to your goed bezig sync? What you played here and what is in your Google Sheet get combined.')) linkDevice(c);
+})();
 go(S.onboarded ? 'home' : 'hello');
+paintSync();
+if (S.sync) syncNow();
+document.addEventListener('visibilitychange', () => { if (!document.hidden && S.sync && Date.now() - (S.sync.at || 0) > 60000) syncNow(); });
+window.addEventListener('online', () => { if (S.sync && syncErr) syncNow(); });
