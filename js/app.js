@@ -1,8 +1,12 @@
 'use strict';
 /* goed bezig: the game. One file, no build step.
    Bump VERSION on every change (and the ?v= in index.html, and CACHE in sw.js). */
-const VERSION = { name: 'GOED BEZIG', v: '1.3.0', date: '2026-11-19', note: 'sync between phone and laptop' };
-const SYNC_READY = true;   // flips to true once the Google Sheet backend exists
+const VERSION = { name: 'GOED BEZIG', v: '1.3.1', date: '2026-11-19', note: 'progress saves itself, no code' };
+const SYNC_READY = true;
+/* Anna's own Google Sheet. Built in on purpose (her choice, 2026-11-19): every device that opens the live game saves there by itself, no code to paste.
+   It is in a public file, so it only guards game progress. If it is ever misused, change SECRET in the Sheet's script, redeploy, and update it here. */
+const SYNC_HOME = { id: 'AKfycbw5pyxSZc0Hi01jIv-c81sZflGlQx_PvGqHVkxz_Sn5ce1VIuLa9uKmRCEv3vASm5F-dQ', key: 'zw19urHr2TjsSdTXvw1gVRWjUrLabsohGjlUiV6q' };
+const SYNC_AUTO = /\.github\.io$/.test(location.hostname);   // local test copies never touch her save
 const KEY = 'goedbezig.v1';
 const DAY = 864e5;
 
@@ -183,7 +187,7 @@ function confetti() {
 }
 
 /* --------------------------------------------------------------------- sync
-   Optional. A device is linked with a sync code (web app id ~ secret). Every sync is
+   Every device that opens the live game links itself to SYNC_HOME (web app id + secret). Every sync is
    pull, merge, push: words keep whichever device answered last, counters add up what
    each device earned since its last sync, so two devices never overwrite each other. */
 let syncBusy = false, syncQueued = false, syncErr = '', syncTimer = null;
@@ -288,30 +292,22 @@ async function syncNow() {
 }
 function syncSoon() { if (!S.sync) return; clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 1200); }
 function syncText() {
-  if (syncBusy) return 'Syncing with your Google Sheet…';
-  if (syncErr) return `Sync did not work just now: ${esc(syncErr)}. Your progress is safe on this device and goes up at the next try.`;
-  if (!S.sync.at) return 'Linked. Not synced yet.';
+  if (syncBusy) return 'Saving to your Google Sheet…';
+  if (syncErr) return `Saving did not work just now: ${esc(syncErr)}. Your progress is safe on this device and goes up at the next try.`;
+  if (!S.sync.at) return 'Not saved yet.';
   const m = Math.round((Date.now() - S.sync.at) / 60000);
-  return `Linked to your Google Sheet. Last synced ${m < 1 ? 'just now' : m < 60 ? m + (m === 1 ? ' minute ago' : ' minutes ago') : new Date(S.sync.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.`;
+  return `Your progress saves itself to your Google Sheet, so your phone and your laptop show the same thing. Last saved ${m < 1 ? 'just now' : m < 60 ? m + (m === 1 ? ' minute ago' : ' minutes ago') : new Date(S.sync.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.`;
 }
 function paintSync() {
   document.body.dataset.sync = !S.sync ? 'off' : syncBusy ? 'busy' : syncErr ? 'error' : 'ok';
   const el = $('#syncStatus'); if (el && S.sync) el.innerHTML = syncText();
 }
-function parseCode(str) { const m = String(str).trim().match(/(?:#sync=)?([A-Za-z0-9_-]{30,})~([A-Za-z0-9]{24,})$/); return m ? { id: m[1], key: m[2] } : null; }
 function linkDevice(c) { S.sync = { id: c.id, key: c.key, rev: 0, at: 0, base: {} }; save(); paintSync(); }
 function syncBlock() {
-  if (!S.sync) return `<h2 class="h">sync</h2>
-    <p class="fine pad">Same progress on your phone and your laptop, kept in your own Google Sheet. Paste your sync code to link this device.</p>
-    <form class="set" data-form="link"><label>sync code<input name="code" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="paste it here"></label>
-      <button class="btn btn-ghost">link this device</button></form>`;
-  return `<h2 class="h">sync</h2>
+  if (!S.sync) return '';
+  return `<h2 class="h">saving</h2>
     <p class="fine pad" id="syncStatus">${syncText()}</p>
-    <div class="actions">
-      <button class="btn btn-ghost" data-act="syncnow">sync now</button>
-      <button class="btn btn-ghost" data-act="synccode">copy the sync code for another device</button>
-      <button class="btn btn-clear danger" data-act="unlink">unlink this device</button>
-    </div>`;
+    <div class="actions"><button class="btn btn-ghost" data-act="syncnow">save now</button></div>`;
 }
 
 /* ------------------------------------------------------------------- router */
@@ -914,7 +910,7 @@ VIEWS.settings = () => `
     <label class="tog"><input type="checkbox" name="sound" ${S.sound ? 'checked' : ''}><span>sounds and buzz</span></label>
     <label class="tog"><input type="checkbox" name="voice" ${S.voice ? 'checked' : ''}><span>say words out loud ${voice ? `(${esc(voice.name)}, ${esc(voice.lang)})` : '(no Dutch voice on this device)'}</span></label>
   </form>
-  ${SYNC_READY || S.sync ? syncBlock() : ''}
+  ${syncBlock()}
   <h2 class="h">een kopie bewaren</h2>
   <p class="fine pad">${S.sync ? 'Sync already keeps a copy in your Google Sheet. A backup file is an extra one you hold yourself.' : 'Progress lives in this browser on this device. Save a backup file now and then.'}</p>
   <div class="actions">
@@ -964,12 +960,6 @@ const ACT = {
   checksent: () => onCheckSent(),
   quit: () => { const b = ses && ses.mode === 'boss'; if (ses && ses.mode !== 'boss' && ses.ok + ses.bad >= 3) { touchStreak(); checkStickers(); save(); syncSoon(); } b ? go('place', ses.place.id) : go('home'); },
   syncnow: () => { syncNow().then(ok => toast(ok ? 'Synced.' : syncErr ? 'Sync did not work: ' + syncErr : 'Already syncing.')); },
-  synccode: () => {
-    const code = S.sync.id + '~' + S.sync.key;
-    const ok = () => toast('Sync code copied. Paste it under instellingen on your other device.');
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(ok, () => prompt('Copy this sync code:', code)); else prompt('Copy this sync code:', code);
-  },
-  unlink: () => { if (confirm('Unlink this device? Your progress stays here and in your Google Sheet, it just stops syncing from this device.')) { delete S.sync; syncErr = ''; save(); go('settings'); } },
   export: () => {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(stripSync(S), null, 1)], { type: 'application/json' }));
@@ -993,13 +983,7 @@ document.addEventListener('submit', e => {
   if (f.dataset.form === 'hello') {
     const fd = new FormData(f);
     S.name = (fd.get('name') || '').trim() || 'Anna'; S.pace = +fd.get('pace') || 20;
-    S.onboarded = true; S.setT = Date.now(); save(); sfx.win(); go('home'); syncSoon();
-  }
-  if (f.dataset.form === 'link') {
-    const c = parseCode(new FormData(f).get('code') || '');
-    if (!c) { toast('That does not look like a sync code.'); return; }
-    linkDevice(c); go('settings');
-    syncNow().then(ok => toast(ok ? 'Linked and synced.' : 'Linked, but the first sync did not work: ' + syncErr));
+    S.onboarded = true; S.setT = S.setT || 1; save(); sfx.win(); go('home'); syncSoon();
   }
 });
 document.addEventListener('change', e => {
@@ -1027,14 +1011,8 @@ document.addEventListener('keydown', e => {
 
 /* --------------------------------------------------------------------- boot */
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
-(function linkFromAddress() {                       // a link ending in #sync=<code> links this device, then the code leaves the address bar
-  const m = location.hash.match(/^#sync=(.+)$/); if (!m) return;
-  history.replaceState(null, '', location.pathname + location.search);
-  const c = parseCode(decodeURIComponent(m[1]));
-  if (!c || (S.sync && S.sync.id === c.id && S.sync.key === c.key)) return;
-  if (confirm('Link this device to your goed bezig sync? What you played here and what is in your Google Sheet get combined.')) linkDevice(c);
-})();
 go(S.onboarded ? 'home' : 'hello');
+if (SYNC_READY && SYNC_AUTO && (!S.sync || S.sync.id !== SYNC_HOME.id || S.sync.key !== SYNC_HOME.key)) linkDevice(SYNC_HOME);
 paintSync();
 if (S.sync) syncNow();
 document.addEventListener('visibilitychange', () => { if (!document.hidden && S.sync && Date.now() - (S.sync.at || 0) > 60000) syncNow(); });

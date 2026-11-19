@@ -42,12 +42,12 @@ Plain HTML, CSS and JavaScript. No build step and no server of its own; sync, wh
 | `js/data.js` | places, words, sentences, levels, stickers, the dog's lines |
 | `js/app.js` | the game: spaced repetition, the walk, all screens |
 | `sw.js` | lets the game open without a connection (network first, cache as fallback) |
-| `backend/Code.gs` | the sync backend, an Apps Script that lives inside the Google Sheet "goed bezig". The copy here has a placeholder where the secret goes |
+| `backend/Code.gs` | the saving backend, an Apps Script that lives inside the Google Sheet "goed bezig". The copy here has a placeholder where the key goes |
 | `manifest.json`, `img/` | lets you add it to a phone home screen as an app |
 
 Progress lives in the browser of the device you play on (localStorage). Settings has "download a backup" and "restore from a backup".
 
-**Sync.** A device that has the sync code also keeps its progress in the Google Sheet "goed bezig", so the phone and the laptop show the same thing. Paste the code once per device under instellingen (on an iPhone, the home-screen app and Safari count as two devices). The Sheet gets a "Progress" tab with one row per day played and a "Words" tab with every word and its strength. The sync code is a secret and is not in this repository. A device without the code sends nothing anywhere.
+**Saving.** The live game also saves by itself to the Google Sheet "goed bezig", so the phone and the laptop show the same thing. Nothing to set up: every device that opens the game does it. The Sheet gets a "Progress" tab with one row per day played and a "Words" tab with every word and its strength. The Sheet's address and key are in `js/app.js` on purpose, so there is no code to paste. That means anyone who opens the game lands in the same save, which is fine for a game with one player. A copy run on localhost never saves to the Sheet.
 
 Words are read aloud with the device's own Dutch voice (the Belgian one when the device has it).
 
@@ -68,3 +68,4 @@ The page is public because GitHub Pages needs a public repository, but it asks s
 | 1.1.0 | 2026-11-19 | nothing is locked any more: all places and sentences open from the start. New: the sneltest (sort what you already know) and "ken ik al" on new-word cards. Sync code added but switched off until its Google Sheet exists |
 | 1.2.0 | 2026-11-19 | 128 more words in five new places: fruit, groenten, salades, vlees & vis, meer hobby's (428 words, 107 sentences). The dog is no longer the mascot: plain greeting on the home screen, no dog name at the start, she keeps her own place |
 | 1.3.0 | 2026-11-19 | sync is on: paste the sync code under instellingen and the phone and laptop share progress through the Google Sheet "goed bezig" |
+| 1.3.1 | 2026-11-19 | progress saves itself: no sync code, every device that opens the game shares the same save |
