@@ -1,0 +1,15 @@
+{
+  "name": "goed bezig",
+  "short_name": "goed bezig",
+  "description": "A silly little game for learning 300 Flemish Dutch words.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FFFFFF",
+  "icons": [
+    { "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
